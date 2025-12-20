@@ -28,6 +28,21 @@ export interface Point {
 }
 
 /**
+ * Scan bounds - defines the area to scan within the video frame
+ * Values can be absolute pixels or relative (0-1) to the frame size
+ */
+export interface ScanBounds {
+  /** X offset from left (pixels or 0-1 relative) */
+  x: number;
+  /** Y offset from top (pixels or 0-1 relative) */
+  y: number;
+  /** Width of scan area (pixels or 0-1 relative) */
+  width: number;
+  /** Height of scan area (pixels or 0-1 relative) */
+  height: number;
+}
+
+/**
  * Preprocessing options
  */
 export interface PreprocessingOptions {
@@ -66,6 +81,8 @@ export interface ScannerOptions {
   preprocessing?: PreprocessingOptions;
   /** Camera configuration */
   camera?: CameraOptions;
+  /** Scan bounds - area to scan within video frame */
+  scanBounds?: ScanBounds;
 }
 
 /**

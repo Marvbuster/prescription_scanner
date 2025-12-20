@@ -5,6 +5,7 @@ import type {
   ScannerEvents,
   PreprocessingOptions,
   CameraOptions,
+  ScanBounds,
 } from './types';
 // Preprocessing not needed - WASM handles RGBA directly
 import { CombinedDecoder } from './decoder';
@@ -20,12 +21,13 @@ import {
  * Main scanner class - the primary interface for barcode scanning
  */
 export class SuperScanner {
-  private options: Required<ScannerOptions>;
+  private options: Required<Omit<ScannerOptions, 'scanBounds'>>;
   private decoder: CombinedDecoder;
   private camera: CameraStream | null = null;
   private scanning = false;
   private animationFrame: number | null = null;
   private lastScanTime = 0;
+  private scanBounds: ScanBounds | null = null;
 
   private scanHandlers = new Set<(result: ScanResult) => void>();
   private errorHandlers = new Set<(error: Error) => void>();
@@ -33,7 +35,7 @@ export class SuperScanner {
   private stopHandlers = new Set<() => void>();
 
   // Default options
-  private static defaultOptions: Required<ScannerOptions> = {
+  private static defaultOptions: Required<Omit<ScannerOptions, 'scanBounds'>> = {
     formats: ['QRCode', 'DataMatrix'],
     preprocessing: {
       binarize: 'none',
@@ -62,6 +64,10 @@ export class SuperScanner {
       },
     };
 
+    if (options.scanBounds) {
+      this.scanBounds = options.scanBounds;
+    }
+
     this.decoder = new CombinedDecoder();
   }
 
@@ -70,6 +76,20 @@ export class SuperScanner {
    */
   async init(): Promise<void> {
     await this.decoder.init(this.options.formats);
+  }
+
+  /**
+   * Set scan bounds
+   */
+  setScanBounds(bounds: ScanBounds | null): void {
+    this.scanBounds = bounds;
+  }
+
+  /**
+   * Get current scan bounds
+   */
+  getScanBounds(): ScanBounds | null {
+    return this.scanBounds;
   }
 
   /**
@@ -223,13 +243,81 @@ export class SuperScanner {
    * Process a single frame
    */
   private async processFrame(imageData: ImageData): Promise<void> {
+    // Crop to scan bounds if set
+    const dataToScan = this.scanBounds
+      ? this.cropImageData(imageData, this.scanBounds)
+      : imageData;
+
     // Decode directly - WASM handles RGBA
-    const results = await this.decoder.decode(imageData, this.options.formats);
+    const results = await this.decoder.decode(dataToScan, this.options.formats);
+
+    // Adjust point coordinates back to full frame if cropped
+    if (this.scanBounds && results.length > 0) {
+      const offsetX = this.computeBoundsPx(imageData.width, imageData.height).x;
+      const offsetY = this.computeBoundsPx(imageData.width, imageData.height).y;
+
+      for (const result of results) {
+        if (result.points) {
+          result.points = result.points.map(p => ({
+            x: p.x + offsetX,
+            y: p.y + offsetY,
+          }));
+        }
+      }
+    }
 
     // Emit results
     for (const result of results) {
       this.emit('scan', result);
     }
+  }
+
+  /**
+   * Crop ImageData to bounds
+   */
+  private cropImageData(imageData: ImageData, bounds: ScanBounds): ImageData {
+    const { x, y, width, height } = this.computeBoundsPx(imageData.width, imageData.height);
+
+    // Clamp to image boundaries
+    const cropX = Math.max(0, Math.min(x, imageData.width));
+    const cropY = Math.max(0, Math.min(y, imageData.height));
+    const cropW = Math.min(width, imageData.width - cropX);
+    const cropH = Math.min(height, imageData.height - cropY);
+
+    if (cropW <= 0 || cropH <= 0) {
+      return imageData; // Invalid bounds, return original
+    }
+
+    // Create new ImageData for cropped region
+    const croppedData = new Uint8ClampedArray(cropW * cropH * 4);
+
+    for (let row = 0; row < cropH; row++) {
+      const srcStart = ((cropY + row) * imageData.width + cropX) * 4;
+      const dstStart = row * cropW * 4;
+      croppedData.set(
+        imageData.data.subarray(srcStart, srcStart + cropW * 4),
+        dstStart
+      );
+    }
+
+    return new ImageData(croppedData, cropW, cropH);
+  }
+
+  /**
+   * Compute bounds in pixels
+   */
+  private computeBoundsPx(frameWidth: number, frameHeight: number): { x: number; y: number; width: number; height: number } {
+    if (!this.scanBounds) {
+      return { x: 0, y: 0, width: frameWidth, height: frameHeight };
+    }
+
+    const b = this.scanBounds;
+    const x = b.x <= 1 ? Math.round(b.x * frameWidth) : Math.round(b.x);
+    const y = b.y <= 1 ? Math.round(b.y * frameHeight) : Math.round(b.y);
+    const width = b.width <= 1 ? Math.round(b.width * frameWidth) : Math.round(b.width);
+    const height = b.height <= 1 ? Math.round(b.height * frameHeight) : Math.round(b.height);
+
+    return { x, y, width, height };
   }
 
   /**

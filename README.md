@@ -11,7 +11,7 @@
 
 Lightweight WASM barcode scanner for web applications. Supports **DataMatrix** and **QR Code**.
 
-**v1.1.4** - clearResults API, bug fixes, unit tests!
+**v1.1.5** - scanBounds API for custom scan areas!
 
 ## Features
 
@@ -153,17 +153,27 @@ interface ScannerOptions {
   // Formats to detect
   formats?: ('DataMatrix' | 'QRCode')[];
 
+  // Scan area (optional - default: full frame)
+  scanBounds?: ScanBounds;
+
   // Callbacks
   onReady?: () => void;                   // Called when WASM is loaded
   onScan?: (result: ScanResult) => void;  // Called for each detected code
   onError?: (error: Error) => void;       // Called on errors
 }
 
+interface ScanBounds {
+  x: number;      // X offset (0-1 relative or pixels)
+  y: number;      // Y offset (0-1 relative or pixels)
+  width: number;  // Width (0-1 relative or pixels)
+  height: number; // Height (0-1 relative or pixels)
+}
+
 interface ScanResult {
   data: string;
   format: 'DataMatrix' | 'QRCode';
   timestamp: number;
-  points: { x: number; y: number }[];
+  points: { x: number; y: number }[];  // Code position in full frame
 }
 ```
 
@@ -232,6 +242,26 @@ Returns all scanned results so far.
 #### `scanner.clearResults()`
 
 Clears all stored results, allowing the same codes to be scanned again.
+
+#### `scanner.setScanBounds(bounds)`
+
+Set the scan area. Values 0-1 are relative to frame size, >1 are absolute pixels.
+
+```typescript
+// Scan center 50% of frame
+scanner.setScanBounds({ x: 0.25, y: 0.25, width: 0.5, height: 0.5 });
+
+// Scan full frame (default)
+scanner.setScanBounds(null);
+```
+
+#### `scanner.getScanBounds()`
+
+Returns current scan bounds or null if scanning full frame.
+
+#### `scanner.getComputedBounds()`
+
+Returns scan bounds in pixels based on current video dimensions.
 
 #### `scanner.destroy()`
 
@@ -305,6 +335,13 @@ PDF.js is lazy-loaded only when processing PDFs.
 Requires WebAssembly and getUserMedia (camera) support.
 
 ## Changelog
+
+### v1.1.5
+- Added `scanBounds` option to limit scan area within video frame
+- Added `setScanBounds()`, `getScanBounds()`, `getComputedBounds()` methods
+- Bounds support relative (0-1) and absolute pixel values
+- Code positions in results are adjusted to full frame coordinates
+- Added ScanBounds demo page
 
 ### v1.1.4
 - Added `clearResults()` method to allow rescanning same codes

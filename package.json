@@ -1,6 +1,6 @@
 {
   "name": "prescription-scanner",
-  "version": "1.1.4",
+  "version": "1.1.5",
   "description": "Lightweight WASM barcode scanner (495KB) - DataMatrix, QR Code, configurable preloading, PDF support, headless API",
   "author": "Robin Wichmann",
   "type": "module",

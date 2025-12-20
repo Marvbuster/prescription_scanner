@@ -6,7 +6,7 @@
 import { SuperScanner } from './scanner';
 import { processPDF, isPDF } from './pdf';
 import { enhanceForScanning } from './preprocessing';
-import type { ScanResult, BarcodeFormat } from './types';
+import type { ScanResult, BarcodeFormat, ScanBounds } from './types';
 
 // ============================================
 // TYPES
@@ -27,6 +27,11 @@ export interface ScannerOptions {
   preload?: PreloadStrategy;
   /** Formate die gescannt werden sollen */
   formats?: BarcodeFormat[];
+  /**
+   * Scan bounds - area to scan within video frame
+   * Values 0-1 are relative to frame size, >1 are absolute pixels
+   */
+  scanBounds?: ScanBounds;
   /** Modal-Titel */
   title?: string;
   /** Button-Text */
@@ -318,7 +323,7 @@ const FILE_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" st
 // ============================================
 
 export class PrescriptionScanner {
-  private options: Required<ScannerOptions>;
+  private options: Required<Omit<ScannerOptions, 'scanBounds'>> & { scanBounds?: ScanBounds };
   private scanner: SuperScanner | null = null;
   private overlay: HTMLElement | null = null;
   private video: HTMLVideoElement | null = null;
@@ -329,12 +334,14 @@ export class PrescriptionScanner {
   private fileInput: HTMLInputElement | null = null;
   private initialized = false;
   private initializing = false;
+  private scanBounds: ScanBounds | null = null;
 
   constructor(options: ScannerOptions = {}) {
     this.options = {
       headless: options.headless ?? true,
       preload: options.preload ?? 'lazy',
       formats: options.formats || ['DataMatrix', 'QRCode'],
+      scanBounds: options.scanBounds,
       title: options.title || 'Barcode scannen',
       buttonText: options.buttonText || 'Scanner öffnen',
       closeOnScan: options.closeOnScan ?? false,
@@ -344,6 +351,10 @@ export class PrescriptionScanner {
       onError: options.onError || (() => {}),
       onClose: options.onClose || (() => {}),
     };
+
+    if (options.scanBounds) {
+      this.scanBounds = options.scanBounds;
+    }
 
     // Handle preload strategy
     this.handlePreload();
@@ -612,6 +623,46 @@ export class PrescriptionScanner {
    */
   clearResults(): void {
     this.results = [];
+  }
+
+  /**
+   * Get current scan bounds
+   * Returns null if scanning full frame
+   */
+  getScanBounds(): ScanBounds | null {
+    return this.scanBounds;
+  }
+
+  /**
+   * Set scan bounds - area to scan within video frame
+   * Values 0-1 are relative to frame size, >1 are absolute pixels
+   * Pass null to scan full frame
+   */
+  setScanBounds(bounds: ScanBounds | null): void {
+    this.scanBounds = bounds;
+    if (this.scanner) {
+      this.scanner.setScanBounds(bounds);
+    }
+  }
+
+  /**
+   * Get computed scan bounds in pixels based on current video dimensions
+   * Returns null if no video or no bounds set
+   */
+  getComputedBounds(): { x: number; y: number; width: number; height: number } | null {
+    if (!this.video || !this.scanBounds) return null;
+
+    const videoWidth = this.video.videoWidth;
+    const videoHeight = this.video.videoHeight;
+    const b = this.scanBounds;
+
+    // Convert relative values (0-1) to pixels
+    const x = b.x <= 1 ? Math.round(b.x * videoWidth) : b.x;
+    const y = b.y <= 1 ? Math.round(b.y * videoHeight) : b.y;
+    const width = b.width <= 1 ? Math.round(b.width * videoWidth) : b.width;
+    const height = b.height <= 1 ? Math.round(b.height * videoHeight) : b.height;
+
+    return { x, y, width, height };
   }
 
   // ============================================

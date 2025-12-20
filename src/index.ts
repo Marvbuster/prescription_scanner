@@ -20,6 +20,7 @@ export type {
   ScannerEvents,
   PreprocessingOptions,
   CameraOptions,
+  ScanBounds,
   Point,
   GrayscaleImage,
 } from './types';

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import type { ScanResult, PrescriptionScanner } from '../../src';
 
 type Mode = 'camera' | 'upload';
@@ -164,7 +165,7 @@ export default function Home() {
             Prescription Scanner
           </h1>
           <p className="text-zinc-500 text-sm mt-2">
-            v1.1.4 • 495 KB • DataMatrix & QR Code
+            v1.1.5 • 495 KB • DataMatrix & QR Code
           </p>
         </div>
 
@@ -217,13 +218,6 @@ export default function Home() {
                 </div>
               )}
 
-              {/* Scan Frame Overlay */}
-              {isScanning && (
-                <>
-                  <div className="absolute inset-8 border-2 border-white/20 rounded-lg pointer-events-none" />
-                  <div className="absolute left-8 right-8 h-0.5 bg-gradient-to-r from-transparent via-emerald-500 to-transparent animate-scanLine" />
-                </>
-              )}
             </div>
 
             {/* Camera Controls */}
@@ -368,16 +362,28 @@ export default function Home() {
 
         {/* Footer */}
         <div className="mt-8 flex flex-col items-center gap-4">
-          <button
-            onClick={openModalDemo}
-            className="text-sm text-zinc-500 hover:text-white transition-colors flex items-center gap-2"
-          >
-            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
-              <line x1="9" y1="3" x2="9" y2="21"/>
-            </svg>
-            Lazyload Demo
-          </button>
+          <div className="flex gap-4">
+            <Link
+              href="/bounds"
+              className="text-sm text-zinc-500 hover:text-white transition-colors flex items-center gap-2"
+            >
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                <rect x="7" y="7" width="10" height="10" rx="1" ry="1"/>
+              </svg>
+              ScanBounds Demo
+            </Link>
+            <button
+              onClick={openModalDemo}
+              className="text-sm text-zinc-500 hover:text-white transition-colors flex items-center gap-2"
+            >
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                <line x1="9" y1="3" x2="9" y2="21"/>
+              </svg>
+              Lazyload Demo
+            </button>
+          </div>
           <div className="text-xs text-zinc-600 text-center">
             <p>PDF Support • Multi-Code • Image Enhancement</p>
             <a

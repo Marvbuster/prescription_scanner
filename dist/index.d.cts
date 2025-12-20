@@ -192,6 +192,10 @@ declare class PrescriptionScanner {
      * Gibt alle bisher gefundenen Ergebnisse zurück
      */
     getResults(): ScanResult[];
+    /**
+     * Löscht alle bisher gefundenen Ergebnisse
+     */
+    clearResults(): void;
     private injectStyles;
     private createModal;
     private setupUploadZone;
