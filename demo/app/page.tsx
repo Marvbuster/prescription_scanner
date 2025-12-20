@@ -164,7 +164,7 @@ export default function Home() {
             Prescription Scanner
           </h1>
           <p className="text-zinc-500 text-sm mt-2">
-            v1.1.3 • 495 KB • DataMatrix & QR Code
+            v1.1.4 • 495 KB • DataMatrix & QR Code
           </p>
         </div>
 

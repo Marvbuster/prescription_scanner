@@ -191,3 +191,14 @@ of the ZXing ("Zebra Crossing") barcode scanning library.
       of your accepting any such warranty or additional liability.
 
    END OF TERMS AND CONDITIONS
+
+================================================================================
+PDF.js (dynamically loaded from CDN)
+================================================================================
+
+Project: PDF.js
+URL: https://github.com/nickthecoder/pdfjs
+License: Apache License 2.0
+
+PDF.js is loaded dynamically from CDN at runtime when processing PDF files.
+It is not bundled with this package.
