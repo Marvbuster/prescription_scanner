@@ -34,31 +34,6 @@ npm install prescription-scanner
 
 ## Usage
 
-### ESM / TypeScript (with Modal UI)
-
-```typescript
-import { PrescriptionScanner } from 'prescription-scanner';
-
-const scanner = new PrescriptionScanner({
-  headless: false,  // Enable modal UI
-  onScan: (result) => {
-    console.log('Scanned:', result.data, result.format);
-  },
-  onMultiScan: (results) => {
-    console.log('All codes:', results);
-  },
-  onError: (error) => {
-    console.error('Error:', error);
-  }
-});
-
-// Open scanner modal (camera + file upload)
-scanner.open();
-
-// Or create a button
-scanner.createButton(document.getElementById('container'));
-```
-
 ### Headless Mode (Default)
 
 The scanner runs in headless mode by default - no UI, just the scanning API:
@@ -91,6 +66,31 @@ const results = await scanner.scanImage(imgElement);
 const results = await scanner.scanImageData(imageData);
 const results = await scanner.scanCanvas(canvasElement);
 const results = await scanner.scanPDF(pdfFile);
+```
+
+### With Modal UI
+
+```typescript
+import { PrescriptionScanner } from 'prescription-scanner';
+
+const scanner = new PrescriptionScanner({
+  headless: false,  // Enable modal UI
+  onScan: (result) => {
+    console.log('Scanned:', result.data, result.format);
+  },
+  onMultiScan: (results) => {
+    console.log('All codes:', results);
+  },
+  onError: (error) => {
+    console.error('Error:', error);
+  }
+});
+
+// Open scanner modal (camera + file upload)
+scanner.open();
+
+// Or create a button
+scanner.createButton(document.getElementById('container'));
 ```
 
 ### WASM Preloading

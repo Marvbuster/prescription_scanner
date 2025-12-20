@@ -2,3 +2,8 @@ node_modules/
 wasm/build/
 wasm/zxing-cpp/
 *.map
+
+# Demo
+demo/node_modules/
+demo/.next/
+demo/.env*.local
