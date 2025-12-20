@@ -1,28 +1,22 @@
 // ============================================
 // PRESCRIPTION SCANNER v1.1
 // Lightweight barcode scanner for DataMatrix and QR Code
-// Now with PDF support and multi-code detection!
+// PDF support, multi-code detection, headless mode!
 // ============================================
 
 // ===================
-// SIMPLE API (recommended)
+// MAIN API
 // ===================
 export { PrescriptionScanner, openScanner } from './modal';
-export type { ScannerModalOptions } from './modal';
+export type { ScannerOptions, PreloadStrategy } from './modal';
 
 // Simple functions
 export { scan, scanAll, scanVideo, startScanner, cleanup } from './simple';
-
-// ===================
-// ADVANCED API
-// ===================
-export { SuperScanner } from './scanner';
 
 // Types
 export type {
   BarcodeFormat,
   ScanResult,
-  ScannerOptions,
   ScannerEvents,
   PreprocessingOptions,
   CameraOptions,
@@ -66,7 +60,7 @@ export {
 } from './camera';
 
 // Decoder access
-export { CombinedDecoder, ZBarDecoder, DataMatrixDecoder } from './decoder';
+export { CombinedDecoder, ScannerWasmDecoder } from './decoder';
 export type { BarcodeDecoder, DecodedBarcode } from './decoder';
 
 // PDF utilities

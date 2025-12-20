@@ -27,7 +27,6 @@ export class SuperScanner {
   private animationFrame: number | null = null;
   private lastScanTime = 0;
 
-  // Event handlers - using any for flexibility
   private scanHandlers = new Set<(result: ScanResult) => void>();
   private errorHandlers = new Set<(error: Error) => void>();
   private startHandlers = new Set<() => void>();
@@ -79,7 +78,7 @@ export class SuperScanner {
   on(event: 'scan', callback: (result: ScanResult) => void): void;
   on(event: 'error', callback: (error: Error) => void): void;
   on(event: 'start' | 'stop', callback: () => void): void;
-  on(event: keyof ScannerEvents, callback: (...args: any[]) => void): void {
+  on(event: keyof ScannerEvents, callback: ((result: ScanResult) => void) | ((error: Error) => void) | (() => void)): void {
     switch (event) {
       case 'scan':
         this.scanHandlers.add(callback as (result: ScanResult) => void);
@@ -88,10 +87,10 @@ export class SuperScanner {
         this.errorHandlers.add(callback as (error: Error) => void);
         break;
       case 'start':
-        this.startHandlers.add(callback);
+        this.startHandlers.add(callback as () => void);
         break;
       case 'stop':
-        this.stopHandlers.add(callback);
+        this.stopHandlers.add(callback as () => void);
         break;
     }
   }
@@ -102,7 +101,7 @@ export class SuperScanner {
   off(event: 'scan', callback: (result: ScanResult) => void): void;
   off(event: 'error', callback: (error: Error) => void): void;
   off(event: 'start' | 'stop', callback: () => void): void;
-  off(event: keyof ScannerEvents, callback: (...args: any[]) => void): void {
+  off(event: keyof ScannerEvents, callback: ((result: ScanResult) => void) | ((error: Error) => void) | (() => void)): void {
     switch (event) {
       case 'scan':
         this.scanHandlers.delete(callback as (result: ScanResult) => void);
@@ -111,10 +110,10 @@ export class SuperScanner {
         this.errorHandlers.delete(callback as (error: Error) => void);
         break;
       case 'start':
-        this.startHandlers.delete(callback);
+        this.startHandlers.delete(callback as () => void);
         break;
       case 'stop':
-        this.stopHandlers.delete(callback);
+        this.stopHandlers.delete(callback as () => void);
         break;
     }
   }
@@ -125,14 +124,14 @@ export class SuperScanner {
   private emit(event: 'scan', result: ScanResult): void;
   private emit(event: 'error', error: Error): void;
   private emit(event: 'start' | 'stop'): void;
-  private emit(event: keyof ScannerEvents, arg?: any): void {
+  private emit(event: keyof ScannerEvents, arg?: ScanResult | Error): void {
     try {
       switch (event) {
         case 'scan':
-          for (const handler of this.scanHandlers) handler(arg);
+          for (const handler of this.scanHandlers) handler(arg as ScanResult);
           break;
         case 'error':
-          for (const handler of this.errorHandlers) handler(arg);
+          for (const handler of this.errorHandlers) handler(arg as Error);
           break;
         case 'start':
           for (const handler of this.startHandlers) handler();

@@ -4,7 +4,7 @@
  */
 
 import { SuperScanner } from './scanner';
-import { processPDF, isPDF, type PDFPage } from './pdf';
+import { processPDF, isPDF } from './pdf';
 import { enhanceForScanning } from './preprocessing';
 import type { ScanResult, BarcodeFormat } from './types';
 
@@ -12,7 +12,19 @@ import type { ScanResult, BarcodeFormat } from './types';
 // TYPES
 // ============================================
 
-export interface ScannerModalOptions {
+export type PreloadStrategy = 'idle' | 'eager' | 'lazy' | false;
+
+export interface ScannerOptions {
+  /** Headless mode - no modal UI, just scanning API */
+  headless?: boolean;
+  /**
+   * WASM preload strategy:
+   * - 'lazy' (default): Load on first use
+   * - 'idle': Load when browser is idle (requestIdleCallback)
+   * - 'eager': Load immediately on instantiation
+   * - false: Manual loading via preload() or init()
+   */
+  preload?: PreloadStrategy;
   /** Formate die gescannt werden sollen */
   formats?: BarcodeFormat[];
   /** Modal-Titel */
@@ -21,6 +33,8 @@ export interface ScannerModalOptions {
   buttonText?: string;
   /** Nach erfolgreichem Scan schließen */
   closeOnScan?: boolean;
+  /** Callback when WASM is loaded and scanner is ready */
+  onReady?: () => void;
   /** Callback bei Scan (wird für jeden gefundenen Code aufgerufen) */
   onScan?: (result: ScanResult) => void;
   /** Callback bei mehreren Codes auf einmal */
@@ -30,6 +44,7 @@ export interface ScannerModalOptions {
   /** Callback wenn Modal schließt */
   onClose?: () => void;
 }
+
 
 // ============================================
 // STYLES
@@ -56,7 +71,7 @@ const STYLES = `
   max-width: 520px;
   width: 100%;
   max-height: 90vh;
-  overflow: hidden;
+  overflow-y: auto;
   box-shadow: 0 25px 50px rgba(0,0,0,0.5);
 }
 .ps-header {
@@ -303,7 +318,7 @@ const FILE_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" st
 // ============================================
 
 export class PrescriptionScanner {
-  private options: Required<ScannerModalOptions>;
+  private options: Required<ScannerOptions>;
   private scanner: SuperScanner | null = null;
   private overlay: HTMLElement | null = null;
   private video: HTMLVideoElement | null = null;
@@ -312,18 +327,223 @@ export class PrescriptionScanner {
   private results: ScanResult[] = [];
   private mode: 'camera' | 'upload' = 'camera';
   private fileInput: HTMLInputElement | null = null;
+  private initialized = false;
+  private initializing = false;
 
-  constructor(options: ScannerModalOptions = {}) {
+  constructor(options: ScannerOptions = {}) {
     this.options = {
+      headless: options.headless ?? true,
+      preload: options.preload ?? 'lazy',
       formats: options.formats || ['DataMatrix', 'QRCode'],
       title: options.title || 'Barcode scannen',
       buttonText: options.buttonText || 'Scanner öffnen',
       closeOnScan: options.closeOnScan ?? false,
+      onReady: options.onReady || (() => {}),
       onScan: options.onScan || (() => {}),
       onMultiScan: options.onMultiScan || (() => {}),
       onError: options.onError || (() => {}),
       onClose: options.onClose || (() => {}),
     };
+
+    // Handle preload strategy
+    this.handlePreload();
+  }
+
+  /**
+   * Handle preload strategy
+   */
+  private handlePreload(): void {
+    const strategy = this.options.preload;
+
+    if (strategy === 'eager') {
+      // Load immediately
+      this.preload();
+    } else if (strategy === 'idle') {
+      // Load when browser is idle
+      if (typeof requestIdleCallback !== 'undefined') {
+        requestIdleCallback(() => this.preload(), { timeout: 5000 });
+      } else {
+        // Fallback for Safari
+        setTimeout(() => this.preload(), 100);
+      }
+    }
+    // 'lazy' and false: do nothing, load on first use
+  }
+
+  /**
+   * Preload WASM module in background
+   * Triggers onReady callback when complete
+   */
+  preload(): Promise<void> {
+    return this.init();
+  }
+
+  /**
+   * Initialize scanner and load WASM
+   * Triggers onReady callback when complete
+   */
+  async init(): Promise<void> {
+    if (this.initialized) return;
+    if (this.initializing) {
+      // Wait for ongoing initialization
+      while (this.initializing) {
+        await new Promise(r => setTimeout(r, 10));
+      }
+      return;
+    }
+
+    this.initializing = true;
+    try {
+      this.scanner = new SuperScanner({ formats: this.options.formats });
+      await this.scanner.init();
+      this.initialized = true;
+      this.options.onReady();
+    } finally {
+      this.initializing = false;
+    }
+  }
+
+  /**
+   * Check if WASM is loaded and scanner is ready
+   */
+  isReady(): boolean {
+    return this.initialized;
+  }
+
+  /**
+   * Scan an image element (headless mode)
+   */
+  async scanImage(image: HTMLImageElement): Promise<ScanResult[]> {
+    await this.init();
+    return this.scanner!.scanImage(image);
+  }
+
+  /**
+   * Scan ImageData directly (headless mode)
+   */
+  async scanImageData(imageData: ImageData): Promise<ScanResult[]> {
+    await this.init();
+    const enhanced = enhanceForScanning(imageData);
+    return this.scanner!.scanImageData(enhanced);
+  }
+
+  /**
+   * Scan a canvas element (headless mode)
+   */
+  async scanCanvas(canvas: HTMLCanvasElement): Promise<ScanResult[]> {
+    await this.init();
+    return this.scanner!.scanCanvas(canvas);
+  }
+
+  /**
+   * Scan a PDF file (headless mode)
+   */
+  async scanPDF(file: File | ArrayBuffer): Promise<ScanResult[]> {
+    await this.init();
+    const pages = await processPDF(file, { scale: 2 });
+    const allResults: ScanResult[] = [];
+
+    for (const page of pages) {
+      const enhanced = enhanceForScanning(page.imageData);
+      const results = await this.scanner!.scanImageData(enhanced);
+      allResults.push(...results);
+    }
+
+    return this.deduplicateResults(allResults);
+  }
+
+  /**
+   * Start continuous scanning on a video element (headless mode)
+   * The video element must already have a camera stream attached
+   */
+  async start(videoElement: HTMLVideoElement): Promise<void> {
+    await this.init();
+
+    // Register scan handler
+    this.scanner!.on('scan', (result) => {
+      this.addResult(result);
+    });
+
+    this.scanner!.on('error', (error) => {
+      this.options.onError(error);
+    });
+
+    await this.scanner!.start(videoElement);
+    this.video = videoElement;
+  }
+
+  /**
+   * Start camera and scanning in a container (headless mode)
+   * Creates a video element and requests camera access
+   * Returns the video element for custom styling
+   */
+  async startCamera(container: HTMLElement): Promise<HTMLVideoElement> {
+    await this.init();
+
+    // Create video element
+    const video = document.createElement('video');
+    video.setAttribute('playsinline', '');
+    video.setAttribute('muted', '');
+    video.muted = true;
+    video.style.width = '100%';
+    video.style.height = '100%';
+    video.style.objectFit = 'cover';
+    container.appendChild(video);
+
+    // Request camera
+    this.stream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: 'environment',
+        width: { ideal: 1280 },
+        height: { ideal: 720 },
+      },
+    });
+
+    video.srcObject = this.stream;
+    await video.play();
+
+    // Register scan handler
+    this.scanner!.on('scan', (result) => {
+      this.addResult(result);
+    });
+
+    this.scanner!.on('error', (error) => {
+      this.options.onError(error);
+    });
+
+    await this.scanner!.start(video);
+    this.video = video;
+
+    return video;
+  }
+
+  /**
+   * Stop camera scanning (headless mode)
+   * Cleans up camera stream and video element
+   */
+  stop(): void {
+    // Stop scanner
+    this.scanner?.stop();
+
+    // Stop camera stream
+    if (this.stream) {
+      this.stream.getTracks().forEach(track => track.stop());
+      this.stream = null;
+    }
+
+    // Remove video element if we created it
+    if (this.video && this.video.parentElement) {
+      this.video.srcObject = null;
+      this.video.remove();
+    }
+    this.video = null;
+  }
+
+  /**
+   * Check if currently scanning
+   */
+  isScanning(): boolean {
+    return this.scanner?.isScanning() ?? false;
   }
 
   /**
@@ -780,7 +1000,7 @@ export class PrescriptionScanner {
 /**
  * Schnellstart - öffnet direkt einen Scanner
  */
-export function openScanner(options: ScannerModalOptions = {}): PrescriptionScanner {
+export function openScanner(options: ScannerOptions = {}): PrescriptionScanner {
   const scanner = new PrescriptionScanner(options);
   scanner.open();
   return scanner;

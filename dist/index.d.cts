@@ -52,17 +52,6 @@ interface CameraOptions {
     scanRate?: number;
 }
 /**
- * Scanner configuration
- */
-interface ScannerOptions {
-    /** Which formats to scan for */
-    formats?: BarcodeFormat[];
-    /** Preprocessing configuration */
-    preprocessing?: PreprocessingOptions;
-    /** Camera configuration */
-    camera?: CameraOptions;
-}
-/**
  * Scanner event types
  */
 interface ScannerEvents {
@@ -85,7 +74,18 @@ interface GrayscaleImage {
  * Zero dependencies, mit PDF & Multi-Code Support
  */
 
-interface ScannerModalOptions {
+type PreloadStrategy = 'idle' | 'eager' | 'lazy' | false;
+interface ScannerOptions {
+    /** Headless mode - no modal UI, just scanning API */
+    headless?: boolean;
+    /**
+     * WASM preload strategy:
+     * - 'lazy' (default): Load on first use
+     * - 'idle': Load when browser is idle (requestIdleCallback)
+     * - 'eager': Load immediately on instantiation
+     * - false: Manual loading via preload() or init()
+     */
+    preload?: PreloadStrategy;
     /** Formate die gescannt werden sollen */
     formats?: BarcodeFormat[];
     /** Modal-Titel */
@@ -94,6 +94,8 @@ interface ScannerModalOptions {
     buttonText?: string;
     /** Nach erfolgreichem Scan schließen */
     closeOnScan?: boolean;
+    /** Callback when WASM is loaded and scanner is ready */
+    onReady?: () => void;
     /** Callback bei Scan (wird für jeden gefundenen Code aufgerufen) */
     onScan?: (result: ScanResult) => void;
     /** Callback bei mehreren Codes auf einmal */
@@ -113,7 +115,63 @@ declare class PrescriptionScanner {
     private results;
     private mode;
     private fileInput;
-    constructor(options?: ScannerModalOptions);
+    private initialized;
+    private initializing;
+    constructor(options?: ScannerOptions);
+    /**
+     * Handle preload strategy
+     */
+    private handlePreload;
+    /**
+     * Preload WASM module in background
+     * Triggers onReady callback when complete
+     */
+    preload(): Promise<void>;
+    /**
+     * Initialize scanner and load WASM
+     * Triggers onReady callback when complete
+     */
+    init(): Promise<void>;
+    /**
+     * Check if WASM is loaded and scanner is ready
+     */
+    isReady(): boolean;
+    /**
+     * Scan an image element (headless mode)
+     */
+    scanImage(image: HTMLImageElement): Promise<ScanResult[]>;
+    /**
+     * Scan ImageData directly (headless mode)
+     */
+    scanImageData(imageData: ImageData): Promise<ScanResult[]>;
+    /**
+     * Scan a canvas element (headless mode)
+     */
+    scanCanvas(canvas: HTMLCanvasElement): Promise<ScanResult[]>;
+    /**
+     * Scan a PDF file (headless mode)
+     */
+    scanPDF(file: File | ArrayBuffer): Promise<ScanResult[]>;
+    /**
+     * Start continuous scanning on a video element (headless mode)
+     * The video element must already have a camera stream attached
+     */
+    start(videoElement: HTMLVideoElement): Promise<void>;
+    /**
+     * Start camera and scanning in a container (headless mode)
+     * Creates a video element and requests camera access
+     * Returns the video element for custom styling
+     */
+    startCamera(container: HTMLElement): Promise<HTMLVideoElement>;
+    /**
+     * Stop camera scanning (headless mode)
+     * Cleans up camera stream and video element
+     */
+    stop(): void;
+    /**
+     * Check if currently scanning
+     */
+    isScanning(): boolean;
     /**
      * Erstellt einen Button der das Scanner-Modal öffnet
      */
@@ -150,7 +208,7 @@ declare class PrescriptionScanner {
 /**
  * Schnellstart - öffnet direkt einen Scanner
  */
-declare function openScanner(options?: ScannerModalOptions): PrescriptionScanner;
+declare function openScanner(options?: ScannerOptions): PrescriptionScanner;
 
 /**
  * PRESCRIPTION SCANNER - Super Simple API
@@ -230,88 +288,6 @@ declare function startScanner(onScan: (result: ScanResult) => void, options?: {
  * Call this when you're done scanning
  */
 declare function cleanup(): void;
-
-/**
- * Main scanner class - the primary interface for barcode scanning
- */
-declare class SuperScanner {
-    private options;
-    private decoder;
-    private camera;
-    private scanning;
-    private animationFrame;
-    private lastScanTime;
-    private scanHandlers;
-    private errorHandlers;
-    private startHandlers;
-    private stopHandlers;
-    private static defaultOptions;
-    constructor(options?: ScannerOptions);
-    /**
-     * Initialize the scanner (load WASM modules)
-     */
-    init(): Promise<void>;
-    /**
-     * Register event handler
-     */
-    on(event: 'scan', callback: (result: ScanResult) => void): void;
-    on(event: 'error', callback: (error: Error) => void): void;
-    on(event: 'start' | 'stop', callback: () => void): void;
-    /**
-     * Remove event handler
-     */
-    off(event: 'scan', callback: (result: ScanResult) => void): void;
-    off(event: 'error', callback: (error: Error) => void): void;
-    off(event: 'start' | 'stop', callback: () => void): void;
-    /**
-     * Emit event
-     */
-    private emit;
-    /**
-     * Start scanning from video element
-     */
-    start(videoElement: HTMLVideoElement): Promise<void>;
-    /**
-     * Stop scanning
-     */
-    stop(): void;
-    /**
-     * Main scan loop
-     */
-    private scanLoop;
-    /**
-     * Process a single frame
-     */
-    private processFrame;
-    /**
-     * Scan a single image
-     */
-    scanImage(image: HTMLImageElement): Promise<ScanResult[]>;
-    /**
-     * Scan ImageData directly
-     */
-    scanImageData(imageData: ImageData): Promise<ScanResult[]>;
-    /**
-     * Scan from canvas
-     */
-    scanCanvas(canvas: HTMLCanvasElement): Promise<ScanResult[]>;
-    /**
-     * Check if currently scanning
-     */
-    isScanning(): boolean;
-    /**
-     * Get supported formats
-     */
-    getSupportedFormats(): BarcodeFormat[];
-    /**
-     * Update options
-     */
-    setOptions(options: Partial<ScannerOptions>): void;
-    /**
-     * Clean up resources
-     */
-    destroy(): void;
-}
 
 /**
  * Convert RGBA ImageData to grayscale using luminosity method
@@ -475,7 +451,7 @@ interface DecodedBarcode {
 }
 
 /**
- * Custom Scanner WASM - 522 KB for 4 formats
+ * Custom Scanner WASM - 495 KB for DataMatrix & QR Code
  */
 
 declare class ScannerWasmDecoder implements BarcodeDecoder {
@@ -493,9 +469,9 @@ declare class ScannerWasmDecoder implements BarcodeDecoder {
 }
 
 /**
- * Combined Decoder - uses our unified WASM
+ * Combined Decoder - uses zxing-cpp WASM
  * Supports: DataMatrix, QRCode
- * Size: ~522 KB
+ * Size: ~495 KB
  */
 declare class CombinedDecoder {
     private decoder;
@@ -545,4 +521,4 @@ declare function isPDF(file: File): boolean;
  */
 declare function isPdfJsLoaded(): boolean;
 
-export { type BarcodeDecoder, type BarcodeFormat, type CameraOptions, type CameraStream, CombinedDecoder, ScannerWasmDecoder as DataMatrixDecoder, type DecodedBarcode, type EnhanceOptions, type GrayscaleImage, type PDFPage, type PDFProcessOptions, type Point, type PreprocessingOptions, PrescriptionScanner, type ScanResult, type ScannerEvents, type ScannerModalOptions, type ScannerOptions, SuperScanner, ScannerWasmDecoder as ZBarDecoder, adaptiveThreshold, adjustBrightnessContrast, binarize, binarizeOtsu, boxBlur, cleanup, enhanceForScanning, gaussianBlur, getAvailableCameras, grabFrame, grayscaleToRGBA, invert, isCameraSupported, isPDF, isPdfJsLoaded, medianFilter, openScanner, otsuThreshold, preprocess, processPDF, scan, scanAll, scanVideo, sharpen, sharpenLight, sharpenRGBA, startCamera, startScanner, stopCamera, stretchContrast, toGrayscale, toImageData, upscaleImage };
+export { type BarcodeDecoder, type BarcodeFormat, type CameraOptions, type CameraStream, CombinedDecoder, type DecodedBarcode, type EnhanceOptions, type GrayscaleImage, type PDFPage, type PDFProcessOptions, type Point, type PreloadStrategy, type PreprocessingOptions, PrescriptionScanner, type ScanResult, type ScannerEvents, type ScannerOptions, ScannerWasmDecoder, adaptiveThreshold, adjustBrightnessContrast, binarize, binarizeOtsu, boxBlur, cleanup, enhanceForScanning, gaussianBlur, getAvailableCameras, grabFrame, grayscaleToRGBA, invert, isCameraSupported, isPDF, isPdfJsLoaded, medianFilter, openScanner, otsuThreshold, preprocess, processPDF, scan, scanAll, scanVideo, sharpen, sharpenLight, sharpenRGBA, startCamera, startScanner, stopCamera, stretchContrast, toGrayscale, toImageData, upscaleImage };

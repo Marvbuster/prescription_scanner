@@ -4,6 +4,11 @@
  */
 
 // PDF.js types
+interface PDFViewport {
+  width: number;
+  height: number;
+}
+
 interface PDFDocumentProxy {
   numPages: number;
   getPage(pageNum: number): Promise<PDFPageProxy>;
@@ -11,12 +16,17 @@ interface PDFDocumentProxy {
 }
 
 interface PDFPageProxy {
-  getViewport(params: { scale: number }): { width: number; height: number };
-  render(params: { canvasContext: CanvasRenderingContext2D; viewport: any }): { promise: Promise<void> };
+  getViewport(params: { scale: number }): PDFViewport;
+  render(params: { canvasContext: CanvasRenderingContext2D; viewport: PDFViewport }): { promise: Promise<void> };
 }
 
 interface PDFLib {
+  GlobalWorkerOptions: { workerSrc: string };
   getDocument(src: { data: ArrayBuffer }): { promise: Promise<PDFDocumentProxy> };
+}
+
+interface WindowWithPdfJs {
+  pdfjsLib?: PDFLib;
 }
 
 let pdfLib: PDFLib | null = null;
@@ -36,7 +46,7 @@ async function loadPdfJs(): Promise<void> {
     const script = document.createElement('script');
     script.src = PDFJS_CDN;
     script.onload = () => {
-      const pdfjsLib = (window as any).pdfjsLib;
+      const pdfjsLib = (window as unknown as WindowWithPdfJs).pdfjsLib;
       if (pdfjsLib) {
         pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_WORKER_CDN;
         pdfLib = pdfjsLib;

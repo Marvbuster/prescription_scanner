@@ -1,5 +1,5 @@
 /**
- * Custom Scanner WASM - 522 KB for 4 formats
+ * Custom Scanner WASM - 495 KB for DataMatrix & QR Code
  */
 
 import type { BarcodeFormat } from '../types';
@@ -27,6 +27,12 @@ interface ScannerModule {
   HEAPU8: Uint8Array;
 }
 
+type CreateScannerFn = (options: { locateFile: (path: string) => string }) => Promise<ScannerModule>;
+
+interface WindowWithScanner {
+  createScanner?: CreateScannerFn;
+}
+
 const FORMAT_MAP: Record<string, BarcodeFormat> = {
   'DataMatrix': 'DataMatrix',
   'QRCode': 'QRCode',
@@ -49,7 +55,8 @@ export class ScannerWasmDecoder implements BarcodeDecoder {
 
   private async loadModule(): Promise<void> {
     await this.loadScript('/wasm/scanner.js');
-    const createScanner = (window as any).createScanner;
+    const createScanner = (window as unknown as WindowWithScanner).createScanner;
+    if (!createScanner) throw new Error('WASM loader not found');
     this.module = await createScanner({
       locateFile: (path: string) => path.endsWith('.wasm') ? '/wasm/scanner.wasm' : path
     });
@@ -58,7 +65,7 @@ export class ScannerWasmDecoder implements BarcodeDecoder {
 
   private loadScript(src: string): Promise<void> {
     return new Promise((resolve, reject) => {
-      if ((window as any).createScanner) {
+      if ((window as unknown as WindowWithScanner).createScanner) {
         resolve();
         return;
       }

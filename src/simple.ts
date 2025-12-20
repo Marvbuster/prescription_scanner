@@ -16,7 +16,7 @@
  *   // Later: stop();
  */
 
-import type { BarcodeFormat, ScanResult, PreprocessingOptions } from './types';
+import type { ScanResult } from './types';
 import { SuperScanner } from './scanner';
 
 // Singleton scanner instance

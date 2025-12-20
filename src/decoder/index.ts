@@ -5,14 +5,10 @@ import { ScannerWasmDecoder } from './scanner-wasm';
 export type { BarcodeDecoder, DecodedBarcode } from './types';
 export { ScannerWasmDecoder } from './scanner-wasm';
 
-// Legacy exports for compatibility
-export { ScannerWasmDecoder as ZBarDecoder } from './scanner-wasm';
-export { ScannerWasmDecoder as DataMatrixDecoder } from './scanner-wasm';
-
 /**
- * Combined Decoder - uses our unified WASM
+ * Combined Decoder - uses zxing-cpp WASM
  * Supports: DataMatrix, QRCode
- * Size: ~522 KB
+ * Size: ~495 KB
  */
 export class CombinedDecoder {
   private decoder: ScannerWasmDecoder;
