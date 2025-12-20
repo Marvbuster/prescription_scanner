@@ -277,14 +277,46 @@ import { processPDF, isPDF } from 'prescription-scanner';
 // Check if file is PDF
 if (isPDF(file)) {
   const pages = await processPDF(file, {
-    scale: 2,        // Render at 2x for better recognition
-    maxPages: 10,    // Process max 10 pages
+    scale: 2,
+    maxPages: 10,
     onProgress: (current, total) => {
       console.log(`Processing page ${current}/${total}`);
     }
   });
+
+  // Each page contains ImageData for scanning
+  for (const page of pages) {
+    const results = await scanner.scanImageData(page.imageData);
+  }
 }
 ```
+
+### PDFProcessOptions
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `scale` | `number` | `2` | Render scale factor. Higher values improve recognition but use more memory |
+| `maxPages` | `number` | `10` | Maximum number of pages to process |
+| `onProgress` | `(current, total) => void` | - | Progress callback, called for each page |
+
+### PDFPage (Return Type)
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `pageNumber` | `number` | Page number (1-indexed) |
+| `imageData` | `ImageData` | Rendered page as ImageData |
+| `width` | `number` | Page width in pixels |
+| `height` | `number` | Page height in pixels |
+
+### PDF Utility Functions
+
+#### `isPDF(file: File): boolean`
+
+Check if a file is a PDF (by MIME type or extension).
+
+#### `isPdfJsLoaded(): boolean`
+
+Check if PDF.js has been loaded from CDN.
 
 ## Supported Formats
 
