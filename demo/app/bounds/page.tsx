@@ -1,8 +1,34 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import type { ScanResult, ScanBounds, PrescriptionScanner } from '../../../src';
 import Link from 'next/link';
+
+interface AnimatedCode {
+  id: number;
+  imageData: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  centerX: number;
+  centerY: number;
+  phase: 'zoom-in' | 'hold' | 'burst';
+  scale: number;
+  opacity: number;
+}
+
+interface Particle {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  size: number;
+  alpha: number;
+  hue: number;
+  rotation: number;
+  rotationSpeed: number;
+}
 
 export default function BoundsDemo() {
   const [results, setResults] = useState<ScanResult[]>([]);
@@ -11,16 +37,255 @@ export default function BoundsDemo() {
   const [error, setError] = useState<string | null>(null);
   const [bounds, setBounds] = useState<ScanBounds>({ x: 0.15, y: 0.15, width: 0.7, height: 0.7 });
   const [computedBounds, setComputedBounds] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
+  const [showPositionDemo, setShowPositionDemo] = useState(false);
+  const [animatedCodes, setAnimatedCodes] = useState<AnimatedCode[]>([]);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const scannerRef = useRef<PrescriptionScanner | null>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const animationIdRef = useRef(0);
+  const particlesRef = useRef<Particle[]>([]);
+  const rafRef = useRef<number>();
 
-  const addResult = (result: ScanResult) => {
+  // Particle animation loop
+  const animateParticles = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    let hasActiveParticles = false;
+
+    for (const p of particlesRef.current) {
+      if (p.alpha <= 0) continue;
+      hasActiveParticles = true;
+
+      // Update physics
+      p.x += p.vx;
+      p.y += p.vy;
+      p.vx *= 0.96;
+      p.vy *= 0.96;
+      p.vy += 0.1; // slight gravity
+      p.alpha -= 0.015;
+      p.size *= 0.97;
+      p.rotation += p.rotationSpeed;
+
+      // Draw particle with glow
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.rotation);
+      ctx.globalAlpha = p.alpha;
+
+      // Outer glow
+      const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, p.size * 2);
+      gradient.addColorStop(0, `hsla(${p.hue}, 80%, 60%, 0.8)`);
+      gradient.addColorStop(0.5, `hsla(${p.hue}, 70%, 50%, 0.3)`);
+      gradient.addColorStop(1, `hsla(${p.hue}, 60%, 40%, 0)`);
+      ctx.fillStyle = gradient;
+      ctx.beginPath();
+      ctx.arc(0, 0, p.size * 2, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Inner bright core
+      ctx.fillStyle = `hsla(${p.hue}, 90%, 70%, 1)`;
+      ctx.beginPath();
+      ctx.arc(0, 0, p.size * 0.5, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.restore();
+    }
+
+    if (hasActiveParticles) {
+      rafRef.current = requestAnimationFrame(animateParticles);
+    } else {
+      particlesRef.current = [];
+      rafRef.current = undefined;
+    }
+  }, []);
+
+  // Create particle explosion
+  const createExplosion = useCallback((centerX: number, centerY: number, width: number, height: number) => {
+    const particles: Particle[] = [];
+    const particleCount = 40;
+    const baseSize = Math.min(width, height) / 8;
+
+    for (let i = 0; i < particleCount; i++) {
+      const angle = (Math.PI * 2 * i) / particleCount + (Math.random() - 0.5) * 0.5;
+      const speed = 3 + Math.random() * 6;
+      const distanceFromCenter = Math.random() * Math.min(width, height) * 0.3;
+
+      particles.push({
+        x: centerX + Math.cos(angle) * distanceFromCenter,
+        y: centerY + Math.sin(angle) * distanceFromCenter,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        size: baseSize * (0.5 + Math.random() * 1),
+        alpha: 0.8 + Math.random() * 0.2,
+        hue: 150 + Math.random() * 20, // emerald hues
+        rotation: Math.random() * Math.PI * 2,
+        rotationSpeed: (Math.random() - 0.5) * 0.2,
+      });
+    }
+
+    // Add some extra sparkles
+    for (let i = 0; i < 20; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 5 + Math.random() * 8;
+
+      particles.push({
+        x: centerX,
+        y: centerY,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        size: baseSize * 0.3,
+        alpha: 1,
+        hue: 160 + Math.random() * 30,
+        rotation: 0,
+        rotationSpeed: 0,
+      });
+    }
+
+    particlesRef.current = [...particlesRef.current, ...particles];
+
+    if (!rafRef.current) {
+      animateParticles();
+    }
+  }, [animateParticles]);
+
+  const captureCodeArea = useCallback((result: ScanResult): AnimatedCode | null => {
+    const video = containerRef.current?.querySelector('video');
+    if (!video || !result.points || result.points.length < 3) return null;
+
+    // Calculate bounding box from points
+    const xs = result.points.map(p => p.x);
+    const ys = result.points.map(p => p.y);
+    const minX = Math.min(...xs);
+    const maxX = Math.max(...xs);
+    const minY = Math.min(...ys);
+    const maxY = Math.max(...ys);
+
+    const codeWidth = maxX - minX;
+    const codeHeight = maxY - minY;
+
+    // Add padding
+    const padding = Math.max(codeWidth, codeHeight) * 0.2;
+    const captureX = Math.max(0, minX - padding);
+    const captureY = Math.max(0, minY - padding);
+    const captureW = Math.min(video.videoWidth - captureX, codeWidth + padding * 2);
+    const captureH = Math.min(video.videoHeight - captureY, codeHeight + padding * 2);
+
+    // Capture from video
+    const canvas = document.createElement('canvas');
+    canvas.width = captureW;
+    canvas.height = captureH;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+
+    ctx.drawImage(video, captureX, captureY, captureW, captureH, 0, 0, captureW, captureH);
+
+    // Calculate position relative to container
+    const containerRect = containerRef.current!.getBoundingClientRect();
+    const scaleX = containerRect.width / video.videoWidth;
+    const scaleY = containerRect.height / video.videoHeight;
+
+    const displayX = captureX * scaleX;
+    const displayY = captureY * scaleY;
+    const displayW = captureW * scaleX;
+    const displayH = captureH * scaleY;
+
+    return {
+      id: ++animationIdRef.current,
+      imageData: canvas.toDataURL(),
+      x: displayX,
+      y: displayY,
+      width: displayW,
+      height: displayH,
+      centerX: displayX + displayW / 2,
+      centerY: displayY + displayH / 2,
+      phase: 'zoom-in',
+      scale: 1,
+      opacity: 1,
+    };
+  }, []);
+
+  const animateCode = useCallback((code: AnimatedCode) => {
+    setAnimatedCodes(prev => [...prev, code]);
+
+    // Phase 1: Zoom in (1.5 seconds)
+    setTimeout(() => {
+      setAnimatedCodes(prev =>
+        prev.map(c => c.id === code.id ? { ...c, phase: 'hold' as const } : c)
+      );
+
+      // Phase 2: Hold (400ms)
+      setTimeout(() => {
+        // Start burst phase
+        setAnimatedCodes(prev =>
+          prev.map(c => c.id === code.id ? { ...c, phase: 'burst' as const } : c)
+        );
+
+        // Create particle explosion
+        createExplosion(code.centerX, code.centerY, code.width * 2, code.height * 2);
+
+        // Animate the image shrinking and fading during burst
+        const startTime = Date.now();
+        const burstDuration = 400;
+
+        const animateBurst = () => {
+          const elapsed = Date.now() - startTime;
+          const progress = Math.min(elapsed / burstDuration, 1);
+
+          // Ease out cubic
+          const eased = 1 - Math.pow(1 - progress, 3);
+
+          setAnimatedCodes(prev =>
+            prev.map(c => {
+              if (c.id !== code.id) return c;
+              return {
+                ...c,
+                scale: 2 - eased * 1.5, // 2 -> 0.5
+                opacity: 1 - eased,
+              };
+            })
+          );
+
+          if (progress < 1) {
+            requestAnimationFrame(animateBurst);
+          } else {
+            // Remove from list
+            setAnimatedCodes(prev => prev.filter(c => c.id !== code.id));
+          }
+        };
+
+        requestAnimationFrame(animateBurst);
+      }, 400);
+    }, 1500);
+  }, [createExplosion]);
+
+  const showPositionDemoRef = useRef(showPositionDemo);
+  useEffect(() => {
+    showPositionDemoRef.current = showPositionDemo;
+  }, [showPositionDemo]);
+
+  const handleScan = useCallback((result: ScanResult) => {
+    // Add to results
     setResults(prev => {
       if (prev.some(r => r.data === result.data)) return prev;
       return [result, ...prev];
     });
-  };
+
+    // Animate if position demo is enabled
+    if (showPositionDemoRef.current && result.points && result.points.length >= 3) {
+      const animatedCode = captureCodeArea(result);
+      if (animatedCode) {
+        animateCode(animatedCode);
+      }
+    }
+  }, [captureCodeArea, animateCode]);
 
   useEffect(() => {
     let mounted = true;
@@ -34,7 +299,7 @@ export default function BoundsDemo() {
         onReady: () => {
           if (mounted) setIsReady(true);
         },
-        onScan: addResult,
+        onScan: handleScan,
         onError: (err: Error) => setError(err.message)
       });
 
@@ -46,8 +311,28 @@ export default function BoundsDemo() {
     return () => {
       mounted = false;
       scannerRef.current?.stop();
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
+      }
     };
-  }, []);
+  }, [handleScan]);
+
+  // Update canvas size when container changes
+  useEffect(() => {
+    const updateCanvasSize = () => {
+      const container = containerRef.current;
+      const canvas = canvasRef.current;
+      if (container && canvas) {
+        const rect = container.getBoundingClientRect();
+        canvas.width = rect.width;
+        canvas.height = rect.height;
+      }
+    };
+
+    updateCanvasSize();
+    window.addEventListener('resize', updateCanvasSize);
+    return () => window.removeEventListener('resize', updateCanvasSize);
+  }, [isScanning]);
 
   useEffect(() => {
     if (scannerRef.current) {
@@ -68,7 +353,8 @@ export default function BoundsDemo() {
     setError(null);
 
     try {
-      await scannerRef.current.startCamera(containerRef.current);
+      const video = await scannerRef.current.startCamera(containerRef.current);
+      videoRef.current = video;
       setIsScanning(true);
       setTimeout(updateComputedBounds, 100);
     } catch (err) {
@@ -80,10 +366,32 @@ export default function BoundsDemo() {
     scannerRef.current?.stop();
     setIsScanning(false);
     setComputedBounds(null);
+    setAnimatedCodes([]);
+    particlesRef.current = [];
+    if (rafRef.current) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = undefined;
+    }
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-zinc-950 to-zinc-900 text-white">
+      <style jsx>{`
+        @keyframes zoomIn {
+          from {
+            transform: scale(1);
+            opacity: 1;
+          }
+          to {
+            transform: scale(2);
+            opacity: 1;
+          }
+        }
+        .animate-zoom-in {
+          animation: zoomIn 1.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+      `}</style>
+
       <div className="max-w-5xl mx-auto p-6">
 
         {/* Header */}
@@ -164,15 +472,50 @@ export default function BoundsDemo() {
                         height: `${bounds.height * 100}%`,
                       }}
                     />
-                    <div
-                      className="absolute h-0.5 bg-gradient-to-r from-transparent via-emerald-500 to-transparent animate-scanLine pointer-events-none"
-                      style={{
-                        left: `${bounds.x * 100}%`,
-                        width: `${bounds.width * 100}%`,
-                      }}
-                    />
                   </>
                 )}
+
+                {/* Animated Code Captures */}
+                {animatedCodes.map(code => (
+                  <div
+                    key={code.id}
+                    className={`absolute pointer-events-none ${
+                      code.phase === 'zoom-in' ? 'animate-zoom-in' : ''
+                    }`}
+                    style={{
+                      left: code.x,
+                      top: code.y,
+                      width: code.width,
+                      height: code.height,
+                      transformOrigin: 'center',
+                      zIndex: 50,
+                      ...(code.phase === 'burst' ? {
+                        transform: `scale(${code.scale})`,
+                        opacity: code.opacity,
+                      } : code.phase === 'hold' ? {
+                        transform: 'scale(2)',
+                      } : {}),
+                    }}
+                  >
+                    <img
+                      src={code.imageData}
+                      alt="Detected code"
+                      className="w-full h-full rounded-lg border-2 border-emerald-400"
+                      style={{
+                        boxShadow: code.phase === 'burst'
+                          ? `0 0 ${30 * code.opacity}px rgba(16, 185, 129, ${code.opacity * 0.8})`
+                          : '0 0 30px rgba(16, 185, 129, 0.6)',
+                      }}
+                    />
+                  </div>
+                ))}
+
+                {/* Particle Canvas */}
+                <canvas
+                  ref={canvasRef}
+                  className="absolute inset-0 pointer-events-none"
+                  style={{ zIndex: 51 }}
+                />
               </div>
 
               {/* Camera Controls */}
@@ -339,6 +682,27 @@ export default function BoundsDemo() {
   height: ${bounds.height.toFixed(2)}
 });`}
               </pre>
+            </div>
+
+            {/* Position Demo Toggle */}
+            <div className="p-4 bg-zinc-900/50 rounded-xl border border-zinc-800">
+              <label className="flex items-center justify-between cursor-pointer">
+                <div>
+                  <p className="text-sm font-medium text-zinc-300">Positionserkennung</p>
+                  <p className="text-xs text-zinc-500">Zeigt erkannte Codes mit Animation</p>
+                </div>
+                <div className="relative">
+                  <input
+                    type="checkbox"
+                    checked={showPositionDemo}
+                    onChange={(e) => setShowPositionDemo(e.target.checked)}
+                    className="sr-only"
+                  />
+                  <div className={`w-11 h-6 rounded-full transition-colors ${showPositionDemo ? 'bg-emerald-500' : 'bg-zinc-700'}`}>
+                    <div className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform ${showPositionDemo ? 'translate-x-5' : ''}`} />
+                  </div>
+                </div>
+              </label>
             </div>
           </div>
 
