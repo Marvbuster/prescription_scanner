@@ -11,7 +11,7 @@
 
 Lightweight WASM barcode scanner for web applications. Supports **DataMatrix** and **QR Code**.
 
-**v1.1.3** - Headless mode, configurable WASM preloading, PDF support!
+**v1.1.4** - clearResults API, bug fixes, unit tests!
 
 ## Features
 
@@ -24,7 +24,6 @@ Lightweight WASM barcode scanner for web applications. Supports **DataMatrix** a
 - Image enhancement - auto upscaling & contrast for better detection
 - Works with any framework (React, Vue, Angular, vanilla JS)
 - Mobile-optimized camera handling
-- Built-in camera modal available via `headless: false`
 
 ## Installation
 
@@ -66,31 +65,6 @@ const results = await scanner.scanImage(imgElement);
 const results = await scanner.scanImageData(imageData);
 const results = await scanner.scanCanvas(canvasElement);
 const results = await scanner.scanPDF(pdfFile);
-```
-
-### With Modal UI
-
-```typescript
-import { PrescriptionScanner } from 'prescription-scanner';
-
-const scanner = new PrescriptionScanner({
-  headless: false,  // Enable modal UI
-  onScan: (result) => {
-    console.log('Scanned:', result.data, result.format);
-  },
-  onMultiScan: (results) => {
-    console.log('All codes:', results);
-  },
-  onError: (error) => {
-    console.error('Error:', error);
-  }
-});
-
-// Open scanner modal (camera + file upload)
-scanner.open();
-
-// Or create a button
-scanner.createButton(document.getElementById('container'));
 ```
 
 ### WASM Preloading
@@ -158,59 +132,31 @@ useEffect(() => {
 <script src="prescription-scanner.global.js"></script>
 <script>
   const scanner = new PrescriptionScanner.PrescriptionScanner({
-    onScan: (result) => {
-      alert('Scanned: ' + result.data);
-    }
+    preload: 'eager',
+    onReady: () => console.log('Ready!'),
+    onScan: (result) => alert('Scanned: ' + result.data)
   });
-  scanner.open();
+
+  document.getElementById('startBtn').onclick = async () => {
+    await scanner.startCamera(document.getElementById('camera'));
+  };
 </script>
 ```
-
-### Scan PDF directly (Advanced API)
-
-```typescript
-import { processPDF, CombinedDecoder } from 'prescription-scanner';
-
-const decoder = new CombinedDecoder();
-await decoder.init(['DataMatrix', 'QRCode']);
-
-// Process PDF file
-const pages = await processPDF(pdfFile, { scale: 2 });
-
-for (const page of pages) {
-  const results = await decoder.decode(page.imageData, ['DataMatrix', 'QRCode']);
-  console.log(`Page ${page.pageNumber}:`, results);
-}
-```
-
-> **Note:** For most use cases, use `PrescriptionScanner` which handles PDF upload via the built-in UI.
 
 ## Options
 
 ```typescript
 interface ScannerOptions {
-  // Mode
-  headless?: boolean;          // Headless mode - no UI (default: true)
-
   // WASM Loading
   preload?: 'idle' | 'eager' | 'lazy' | false;  // Preload strategy (default: 'lazy')
-
-  // Text (modal only)
-  title?: string;              // Modal title (default: "Scanner")
-  buttonText?: string;         // Button text (default: "Scan")
-
-  // Behavior
-  closeOnScan?: boolean;       // Auto-close after scan (default: false)
 
   // Formats to detect
   formats?: ('DataMatrix' | 'QRCode')[];
 
   // Callbacks
-  onReady?: () => void;                         // Called when WASM is loaded
-  onScan?: (result: ScanResult) => void;        // Called for each code
-  onMultiScan?: (results: ScanResult[]) => void; // Called on close with all codes
-  onError?: (error: Error) => void;
-  onClose?: () => void;
+  onReady?: () => void;                   // Called when WASM is loaded
+  onScan?: (result: ScanResult) => void;  // Called for each detected code
+  onError?: (error: Error) => void;       // Called on errors
 }
 
 interface ScanResult {
@@ -241,23 +187,7 @@ Initialize scanner and load WASM. Returns `Promise<void>`. Triggers `onReady` wh
 
 Returns `true` if WASM is loaded and scanner is ready.
 
-### Modal Methods
-
-#### `scanner.open()`
-
-Opens the camera modal and starts scanning. Modal has two tabs:
-- **Kamera**: Live camera scanning
-- **Datei/PDF**: Upload images or PDFs
-
-#### `scanner.close()`
-
-Closes the modal and stops the camera.
-
-#### `scanner.createButton(container?)`
-
-Creates and returns a styled button that opens the scanner.
-
-### Headless Methods (Camera)
+### Camera Methods
 
 #### `scanner.startCamera(container)`
 
@@ -275,7 +205,7 @@ Stop scanning and clean up camera stream and video element.
 
 Returns `true` if currently scanning.
 
-### Headless Methods (Static)
+### Static Methods
 
 #### `scanner.scanImage(image)`
 
@@ -298,6 +228,10 @@ Scan all pages of a PDF file. Returns `Promise<ScanResult[]>`.
 #### `scanner.getResults()`
 
 Returns all scanned results so far.
+
+#### `scanner.clearResults()`
+
+Clears all stored results, allowing the same codes to be scanned again.
 
 #### `scanner.destroy()`
 
@@ -371,6 +305,12 @@ PDF.js is lazy-loaded only when processing PDFs.
 Requires WebAssembly and getUserMedia (camera) support.
 
 ## Changelog
+
+### v1.1.4
+- Added `clearResults()` method to allow rescanning same codes
+- Fixed camera restart bug (camera couldn't restart after stopping)
+- Renamed "Built-in Modal Demo" to "Lazyload Demo"
+- Added unit tests
 
 ### v1.1.3
 - **Configurable WASM preloading**: `'idle'`, `'eager'`, `'lazy'`, or `false`

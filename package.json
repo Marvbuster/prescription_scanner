@@ -1,6 +1,6 @@
 {
   "name": "prescription-scanner",
-  "version": "1.1.3",
+  "version": "1.1.4",
   "description": "Lightweight WASM barcode scanner (495KB) - DataMatrix, QR Code, configurable preloading, PDF support, headless API",
   "author": "Robin Wichmann",
   "type": "module",
@@ -29,12 +29,16 @@
     "build:wasm": "./wasm/build.sh",
     "build:prod": "tsup --no-sourcemap && cp wasm/scanner.js wasm/scanner.wasm dist/",
     "dev": "tsup --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "prepublishOnly": "npm run build:prod"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
+    "jsdom": "^25.0.0",
     "tsup": "^8.0.0",
-    "typescript": "^5.0.0"
+    "typescript": "^5.0.0",
+    "vitest": "^2.0.0"
   },
   "keywords": [
     "barcode",

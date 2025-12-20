@@ -607,6 +607,13 @@ export class PrescriptionScanner {
     return [...this.results];
   }
 
+  /**
+   * Löscht alle bisher gefundenen Ergebnisse
+   */
+  clearResults(): void {
+    this.results = [];
+  }
+
   // ============================================
   // PRIVATE METHODS
   // ============================================

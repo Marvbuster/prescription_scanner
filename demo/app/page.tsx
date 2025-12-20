@@ -66,7 +66,6 @@ export default function Home() {
 
   const stopCamera = () => {
     scannerRef.current?.stop();
-    scannerRef.current = null;
     setIsScanning(false);
   };
 
@@ -330,7 +329,10 @@ export default function Home() {
                   {results.length}
                 </span>
                 <button
-                  onClick={() => setResults([])}
+                  onClick={() => {
+                    setResults([]);
+                    scannerRef.current?.clearResults();
+                  }}
                   className="text-xs text-zinc-500 hover:text-white transition-colors"
                 >
                   Clear
@@ -374,7 +376,7 @@ export default function Home() {
               <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
               <line x1="9" y1="3" x2="9" y2="21"/>
             </svg>
-            Built-in Modal Demo
+            Lazyload Demo
           </button>
           <div className="text-xs text-zinc-600 text-center">
             <p>PDF Support • Multi-Code • Image Enhancement</p>
