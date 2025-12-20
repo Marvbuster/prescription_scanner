@@ -209,6 +209,9 @@ Requires WebAssembly and getUserMedia (camera) support.
 
 ## Changelog
 
+### v1.1.1
+- Updated README and package.json documentation
+
 ### v1.1.0
 - Added PDF support with PDF.js
 - Added multi-code detection
