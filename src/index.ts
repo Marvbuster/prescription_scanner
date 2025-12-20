@@ -1,6 +1,7 @@
 // ============================================
-// PRESCRIPTION SCANNER
+// PRESCRIPTION SCANNER v1.1
 // Lightweight barcode scanner for DataMatrix and QR Code
+// Now with PDF support and multi-code detection!
 // ============================================
 
 // ===================
@@ -61,6 +62,10 @@ export {
 // Decoder access
 export { CombinedDecoder, ZBarDecoder, DataMatrixDecoder } from './decoder';
 export type { BarcodeDecoder, DecodedBarcode } from './decoder';
+
+// PDF utilities
+export { processPDF, isPDF, isPdfJsLoaded } from './pdf';
+export type { PDFPage, PDFProcessOptions } from './pdf';
 
 // WASM files need to be copied to your public folder:
 // - scanner.js (~53 KB)

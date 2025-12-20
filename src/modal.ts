@@ -1,9 +1,10 @@
 /**
- * PRESCRIPTION SCANNER - Vanilla JS Modal
- * Zero dependencies, selbstständiges Modal mit Scanner
+ * PRESCRIPTION SCANNER v1.1 - Vanilla JS Modal
+ * Zero dependencies, mit PDF & Multi-Code Support
  */
 
 import { SuperScanner } from './scanner';
+import { processPDF, isPDF, type PDFPage } from './pdf';
 import type { ScanResult, BarcodeFormat } from './types';
 
 // ============================================
@@ -19,8 +20,10 @@ export interface ScannerModalOptions {
   buttonText?: string;
   /** Nach erfolgreichem Scan schließen */
   closeOnScan?: boolean;
-  /** Callback bei Scan */
+  /** Callback bei Scan (wird für jeden gefundenen Code aufgerufen) */
   onScan?: (result: ScanResult) => void;
+  /** Callback bei mehreren Codes auf einmal */
+  onMultiScan?: (results: ScanResult[]) => void;
   /** Callback bei Fehler */
   onError?: (error: Error) => void;
   /** Callback wenn Modal schließt */
@@ -38,7 +41,7 @@ const STYLES = `
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0,0,0,0.8);
+  background: rgba(0,0,0,0.85);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -49,7 +52,7 @@ const STYLES = `
 .ps-modal {
   background: #1a1a1a;
   border-radius: 12px;
-  max-width: 480px;
+  max-width: 520px;
   width: 100%;
   max-height: 90vh;
   overflow: hidden;
@@ -81,6 +84,33 @@ const STYLES = `
 .ps-content {
   padding: 20px;
 }
+.ps-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.ps-tab {
+  flex: 1;
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #888;
+  background: #252525;
+  border: 1px solid #333;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.ps-tab:hover { background: #2a2a2a; }
+.ps-tab.active {
+  color: #fff;
+  background: #2563eb;
+  border-color: #2563eb;
+}
+.ps-tab svg { width: 18px; height: 18px; }
 .ps-video-container {
   position: relative;
   width: 100%;
@@ -93,6 +123,40 @@ const STYLES = `
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+.ps-upload-zone {
+  width: 100%;
+  aspect-ratio: 4/3;
+  background: #252525;
+  border: 2px dashed #444;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.ps-upload-zone:hover, .ps-upload-zone.dragover {
+  border-color: #2563eb;
+  background: #1e3a5f;
+}
+.ps-upload-zone svg {
+  width: 48px;
+  height: 48px;
+  color: #666;
+}
+.ps-upload-zone.dragover svg { color: #2563eb; }
+.ps-upload-text {
+  color: #888;
+  font-size: 14px;
+  text-align: center;
+}
+.ps-upload-text strong { color: #2563eb; }
+.ps-upload-hint {
+  color: #666;
+  font-size: 12px;
 }
 .ps-loading {
   position: absolute;
@@ -128,17 +192,42 @@ const STYLES = `
   box-shadow: 0 0 8px #22c55e;
   animation: ps-scan 2s ease-in-out infinite;
 }
-.ps-result {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  padding: 12px 16px;
-  background: rgba(34,197,94,0.9);
+.ps-results {
+  margin-top: 16px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+.ps-result-item {
+  padding: 12px;
+  background: #252525;
+  border-radius: 8px;
+  margin-bottom: 8px;
+  border-left: 3px solid #22c55e;
+}
+.ps-result-format {
+  font-size: 11px;
+  font-weight: 600;
+  color: #22c55e;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+.ps-result-data {
+  font-size: 13px;
   color: #fff;
-  font-size: 14px;
-  font-weight: 500;
-  text-align: center;
+  word-break: break-all;
+  font-family: monospace;
+}
+.ps-result-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: #22c55e;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 20px;
+  margin-bottom: 12px;
 }
 .ps-footer {
   padding: 16px 20px;
@@ -173,10 +262,8 @@ const STYLES = `
   gap: 8px;
 }
 .ps-btn:hover { background: #1d4ed8; }
-.ps-btn svg {
-  width: 20px;
-  height: 20px;
-}
+.ps-btn svg { width: 20px; height: 20px; }
+.ps-hidden { display: none !important; }
 @keyframes ps-spin {
   to { transform: rotate(360deg); }
 }
@@ -194,6 +281,22 @@ const SCANNER_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
   <line x1="7" y1="12" x2="17" y2="12"/>
 </svg>`;
 
+const CAMERA_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+  <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+  <circle cx="12" cy="13" r="4"/>
+</svg>`;
+
+const UPLOAD_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+  <polyline points="17 8 12 3 7 8"/>
+  <line x1="12" y1="3" x2="12" y2="15"/>
+</svg>`;
+
+const FILE_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+  <polyline points="14 2 14 8 20 8"/>
+</svg>`;
+
 // ============================================
 // MODAL CLASS
 // ============================================
@@ -205,6 +308,9 @@ export class PrescriptionScanner {
   private video: HTMLVideoElement | null = null;
   private stream: MediaStream | null = null;
   private stylesInjected = false;
+  private results: ScanResult[] = [];
+  private mode: 'camera' | 'upload' = 'camera';
+  private fileInput: HTMLInputElement | null = null;
 
   constructor(options: ScannerModalOptions = {}) {
     this.options = {
@@ -213,7 +319,8 @@ export class PrescriptionScanner {
       buttonText: options.buttonText || 'Scanner öffnen',
       closeOnScan: options.closeOnScan ?? false,
       onScan: options.onScan || (() => {}),
-      onError: options.onError || console.error,
+      onMultiScan: options.onMultiScan || (() => {}),
+      onError: options.onError || (() => {}),
       onClose: options.onClose || (() => {}),
     };
   }
@@ -238,6 +345,7 @@ export class PrescriptionScanner {
    * Öffnet das Scanner-Modal
    */
   async open(): Promise<void> {
+    this.results = [];
     this.injectStyles();
     this.createModal();
     await this.startScanner();
@@ -254,6 +362,11 @@ export class PrescriptionScanner {
       this.overlay = null;
     }
 
+    // Emit all collected results
+    if (this.results.length > 0) {
+      this.options.onMultiScan(this.results);
+    }
+
     this.options.onClose();
   }
 
@@ -264,6 +377,13 @@ export class PrescriptionScanner {
     this.close();
     this.scanner?.destroy();
     this.scanner = null;
+  }
+
+  /**
+   * Gibt alle bisher gefundenen Ergebnisse zurück
+   */
+  getResults(): ScanResult[] {
+    return [...this.results];
   }
 
   // ============================================
@@ -282,14 +402,12 @@ export class PrescriptionScanner {
   }
 
   private createModal(): void {
-    // Overlay
     this.overlay = document.createElement('div');
     this.overlay.className = 'ps-overlay';
     this.overlay.onclick = (e) => {
       if (e.target === this.overlay) this.close();
     };
 
-    // Modal HTML
     this.overlay.innerHTML = `
       <div class="ps-modal">
         <div class="ps-header">
@@ -297,16 +415,34 @@ export class PrescriptionScanner {
           <button class="ps-close" aria-label="Schließen">&times;</button>
         </div>
         <div class="ps-content">
-          <div class="ps-video-container">
-            <video class="ps-video" playsinline muted></video>
-            <div class="ps-loading">
-              <div class="ps-spinner"></div>
-              <span class="ps-loading-text">Scanner wird geladen...</span>
+          <div class="ps-tabs">
+            <button class="ps-tab active" data-mode="camera">
+              ${CAMERA_ICON} Kamera
+            </button>
+            <button class="ps-tab" data-mode="upload">
+              ${FILE_ICON} Datei/PDF
+            </button>
+          </div>
+          <div class="ps-camera-view">
+            <div class="ps-video-container">
+              <video class="ps-video" playsinline muted></video>
+              <div class="ps-loading">
+                <div class="ps-spinner"></div>
+                <span class="ps-loading-text">Scanner wird geladen...</span>
+              </div>
             </div>
           </div>
+          <div class="ps-upload-view ps-hidden">
+            <div class="ps-upload-zone">
+              ${UPLOAD_ICON}
+              <span class="ps-upload-text"><strong>Klicken</strong> oder Datei hierher ziehen</span>
+              <span class="ps-upload-hint">Bilder (JPG, PNG) oder PDF</span>
+            </div>
+          </div>
+          <div class="ps-results"></div>
         </div>
         <div class="ps-footer">
-          <button class="ps-cancel">Abbrechen</button>
+          <button class="ps-cancel">Schließen</button>
         </div>
       </div>
     `;
@@ -314,6 +450,19 @@ export class PrescriptionScanner {
     // Event Listeners
     this.overlay.querySelector('.ps-close')!.addEventListener('click', () => this.close());
     this.overlay.querySelector('.ps-cancel')!.addEventListener('click', () => this.close());
+
+    // Tab switching
+    const tabs = this.overlay.querySelectorAll('.ps-tab');
+    tabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        const mode = tab.getAttribute('data-mode') as 'camera' | 'upload';
+        this.switchMode(mode);
+      });
+    });
+
+    // File upload
+    const uploadZone = this.overlay.querySelector('.ps-upload-zone') as HTMLElement;
+    this.setupUploadZone(uploadZone);
 
     // ESC Key
     const handleEsc = (e: KeyboardEvent) => {
@@ -324,11 +473,190 @@ export class PrescriptionScanner {
     };
     document.addEventListener('keydown', handleEsc);
 
-    // Video Element
     this.video = this.overlay.querySelector('.ps-video');
 
     document.body.appendChild(this.overlay);
     document.body.style.overflow = 'hidden';
+  }
+
+  private setupUploadZone(zone: HTMLElement): void {
+    // Create hidden file input
+    this.fileInput = document.createElement('input');
+    this.fileInput.type = 'file';
+    this.fileInput.accept = 'image/*,application/pdf';
+    this.fileInput.style.display = 'none';
+
+    this.fileInput.addEventListener('change', () => {
+      const file = this.fileInput?.files?.[0];
+      if (file) this.processFile(file);
+    });
+
+    zone.appendChild(this.fileInput);
+
+    // Click to upload
+    zone.addEventListener('click', () => {
+      this.fileInput?.click();
+    });
+
+    // Drag & Drop
+    zone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      zone.classList.add('dragover');
+    });
+
+    zone.addEventListener('dragleave', () => {
+      zone.classList.remove('dragover');
+    });
+
+    zone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      zone.classList.remove('dragover');
+      const file = e.dataTransfer?.files[0];
+      if (file) this.processFile(file);
+    });
+  }
+
+  private switchMode(mode: 'camera' | 'upload'): void {
+    if (!this.overlay) return;
+    this.mode = mode;
+
+    const tabs = this.overlay.querySelectorAll('.ps-tab');
+    tabs.forEach(tab => {
+      tab.classList.toggle('active', tab.getAttribute('data-mode') === mode);
+    });
+
+    const cameraView = this.overlay.querySelector('.ps-camera-view') as HTMLElement;
+    const uploadView = this.overlay.querySelector('.ps-upload-view') as HTMLElement;
+
+    if (mode === 'camera') {
+      cameraView.classList.remove('ps-hidden');
+      uploadView.classList.add('ps-hidden');
+      if (!this.scanner?.isScanning()) {
+        this.startScanner();
+      }
+    } else {
+      cameraView.classList.add('ps-hidden');
+      uploadView.classList.remove('ps-hidden');
+      this.stopScanner();
+    }
+  }
+
+  private async processFile(file: File): Promise<void> {
+    if (!this.overlay) return;
+
+    const uploadZone = this.overlay.querySelector('.ps-upload-zone') as HTMLElement;
+    const originalContent = uploadZone.innerHTML;
+
+    // Show loading
+    uploadZone.innerHTML = `
+      <div class="ps-spinner"></div>
+      <span class="ps-loading-text">Verarbeite ${file.name}...</span>
+    `;
+
+    try {
+      // Initialize scanner if needed
+      if (!this.scanner) {
+        this.scanner = new SuperScanner({ formats: this.options.formats });
+        await this.scanner.init();
+      }
+
+      let foundResults: ScanResult[] = [];
+
+      if (isPDF(file)) {
+        // Process PDF
+        const pages = await processPDF(file, {
+          scale: 2,
+          onProgress: (current, total) => {
+            const loadingText = uploadZone.querySelector('.ps-loading-text');
+            if (loadingText) {
+              loadingText.textContent = `Seite ${current}/${total}...`;
+            }
+          },
+        });
+
+        for (const page of pages) {
+          const results = await this.scanner.scanImageData(page.imageData);
+          foundResults.push(...results);
+        }
+      } else {
+        // Process image
+        const imageData = await this.loadImage(file);
+        foundResults = await this.scanner.scanImageData(imageData);
+      }
+
+      // Deduplicate by data content
+      const unique = this.deduplicateResults(foundResults);
+
+      if (unique.length > 0) {
+        for (const result of unique) {
+          this.addResult(result);
+        }
+        uploadZone.innerHTML = `
+          <svg viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2" style="width:48px;height:48px">
+            <polyline points="20 6 9 17 4 12"/>
+          </svg>
+          <span class="ps-loading-text" style="color:#22c55e">${unique.length} Code${unique.length > 1 ? 's' : ''} gefunden!</span>
+        `;
+      } else {
+        uploadZone.innerHTML = `
+          <svg viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" style="width:48px;height:48px">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="15" y1="9" x2="9" y2="15"/>
+            <line x1="9" y1="9" x2="15" y2="15"/>
+          </svg>
+          <span class="ps-loading-text" style="color:#ef4444">Kein Barcode gefunden</span>
+        `;
+      }
+
+      // Reset after delay
+      setTimeout(() => {
+        if (uploadZone && this.overlay) {
+          uploadZone.innerHTML = originalContent;
+          this.setupUploadZone(uploadZone);
+        }
+      }, 2500);
+
+    } catch (error) {
+      uploadZone.innerHTML = `
+        <span class="ps-loading-text" style="color:#ef4444">
+          Fehler: ${error instanceof Error ? error.message : 'Unbekannt'}
+        </span>
+      `;
+      this.options.onError(error instanceof Error ? error : new Error(String(error)));
+
+      setTimeout(() => {
+        if (uploadZone && this.overlay) {
+          uploadZone.innerHTML = originalContent;
+          this.setupUploadZone(uploadZone);
+        }
+      }, 3000);
+    }
+  }
+
+  private async loadImage(file: File): Promise<ImageData> {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        const ctx = canvas.getContext('2d')!;
+        ctx.drawImage(img, 0, 0);
+        resolve(ctx.getImageData(0, 0, canvas.width, canvas.height));
+      };
+      img.onerror = () => reject(new Error('Bild konnte nicht geladen werden'));
+      img.src = URL.createObjectURL(file);
+    });
+  }
+
+  private deduplicateResults(results: ScanResult[]): ScanResult[] {
+    const seen = new Set<string>();
+    return results.filter(r => {
+      const key = `${r.format}:${r.data}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
   }
 
   private async startScanner(): Promise<void> {
@@ -338,7 +666,6 @@ export class PrescriptionScanner {
     const containerEl = this.overlay.querySelector('.ps-video-container') as HTMLElement;
 
     try {
-      // Scanner initialisieren
       this.scanner = new SuperScanner({
         formats: this.options.formats,
       });
@@ -347,8 +674,7 @@ export class PrescriptionScanner {
 
       // Scan Event
       this.scanner.on('scan', (result) => {
-        this.showResult(result);
-        this.options.onScan(result);
+        this.addResult(result);
 
         if (this.options.closeOnScan) {
           setTimeout(() => this.close(), 1000);
@@ -367,15 +693,16 @@ export class PrescriptionScanner {
       this.video.srcObject = this.stream;
       await this.video.play();
 
-      // Scanner starten
       await this.scanner.start(this.video);
 
-      // Loading ausblenden, Scan-Linie zeigen
       loadingEl.style.display = 'none';
 
-      const scanLine = document.createElement('div');
-      scanLine.className = 'ps-scan-line';
-      containerEl.appendChild(scanLine);
+      // Only add scan line if none exists
+      if (!containerEl.querySelector('.ps-scan-line')) {
+        const scanLine = document.createElement('div');
+        scanLine.className = 'ps-scan-line';
+        containerEl.appendChild(scanLine);
+      }
 
     } catch (error) {
       loadingEl.innerHTML = `
@@ -395,35 +722,50 @@ export class PrescriptionScanner {
       this.stream = null;
     }
 
+    // Remove scan line when stopping
+    if (this.overlay) {
+      this.overlay.querySelector('.ps-scan-line')?.remove();
+    }
+
     document.body.style.overflow = '';
   }
 
-  private showResult(result: ScanResult): void {
+  private addResult(result: ScanResult): void {
+    // Check for duplicate
+    const isDuplicate = this.results.some(r => r.data === result.data && r.format === result.format);
+    if (isDuplicate) return;
+
+    this.results.push(result);
+    this.options.onScan(result);
+    this.updateResultsUI();
+  }
+
+  private updateResultsUI(): void {
     if (!this.overlay) return;
 
-    const container = this.overlay.querySelector('.ps-video-container');
-    if (!container) return;
+    const resultsEl = this.overlay.querySelector('.ps-results') as HTMLElement;
+    if (!resultsEl) return;
 
-    // Scan-Linie entfernen
-    container.querySelector('.ps-scan-line')?.remove();
+    resultsEl.innerHTML = `
+      <div class="ps-result-count">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px">
+          <polyline points="20 6 9 17 4 12"/>
+        </svg>
+        ${this.results.length} Code${this.results.length > 1 ? 's' : ''} gefunden
+      </div>
+      ${this.results.map(r => `
+        <div class="ps-result-item">
+          <div class="ps-result-format">${r.format}</div>
+          <div class="ps-result-data">${this.escapeHtml(r.data)}</div>
+        </div>
+      `).join('')}
+    `;
+  }
 
-    // Ergebnis anzeigen
-    const resultEl = document.createElement('div');
-    resultEl.className = 'ps-result';
-    resultEl.textContent = `✓ ${result.format}: ${result.data.substring(0, 50)}${result.data.length > 50 ? '...' : ''}`;
-    container.appendChild(resultEl);
-
-    // Nach 2 Sekunden entfernen
-    setTimeout(() => {
-      resultEl.remove();
-
-      // Scan-Linie wieder zeigen wenn Modal noch offen und keine existiert
-      if (this.overlay && !this.options.closeOnScan && !container.querySelector('.ps-scan-line')) {
-        const scanLine = document.createElement('div');
-        scanLine.className = 'ps-scan-line';
-        container.appendChild(scanLine);
-      }
-    }, 2000);
+  private escapeHtml(text: string): string {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
   }
 }
 
@@ -433,12 +775,6 @@ export class PrescriptionScanner {
 
 /**
  * Schnellstart - öffnet direkt einen Scanner
- *
- * @example
- * openScanner({
- *   onScan: (result) => console.log(result.data),
- *   closeOnScan: true
- * });
  */
 export function openScanner(options: ScannerModalOptions = {}): PrescriptionScanner {
   const scanner = new PrescriptionScanner(options);

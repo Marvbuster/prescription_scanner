@@ -81,8 +81,8 @@ interface GrayscaleImage {
 }
 
 /**
- * PRESCRIPTION SCANNER - Vanilla JS Modal
- * Zero dependencies, selbstständiges Modal mit Scanner
+ * PRESCRIPTION SCANNER v1.1 - Vanilla JS Modal
+ * Zero dependencies, mit PDF & Multi-Code Support
  */
 
 interface ScannerModalOptions {
@@ -94,8 +94,10 @@ interface ScannerModalOptions {
     buttonText?: string;
     /** Nach erfolgreichem Scan schließen */
     closeOnScan?: boolean;
-    /** Callback bei Scan */
+    /** Callback bei Scan (wird für jeden gefundenen Code aufgerufen) */
     onScan?: (result: ScanResult) => void;
+    /** Callback bei mehreren Codes auf einmal */
+    onMultiScan?: (results: ScanResult[]) => void;
     /** Callback bei Fehler */
     onError?: (error: Error) => void;
     /** Callback wenn Modal schließt */
@@ -108,6 +110,9 @@ declare class PrescriptionScanner {
     private video;
     private stream;
     private stylesInjected;
+    private results;
+    private mode;
+    private fileInput;
     constructor(options?: ScannerModalOptions);
     /**
      * Erstellt einen Button der das Scanner-Modal öffnet
@@ -125,20 +130,25 @@ declare class PrescriptionScanner {
      * Cleanup - alle Ressourcen freigeben
      */
     destroy(): void;
+    /**
+     * Gibt alle bisher gefundenen Ergebnisse zurück
+     */
+    getResults(): ScanResult[];
     private injectStyles;
     private createModal;
+    private setupUploadZone;
+    private switchMode;
+    private processFile;
+    private loadImage;
+    private deduplicateResults;
     private startScanner;
     private stopScanner;
-    private showResult;
+    private addResult;
+    private updateResultsUI;
+    private escapeHtml;
 }
 /**
  * Schnellstart - öffnet direkt einen Scanner
- *
- * @example
- * openScanner({
- *   onScan: (result) => console.log(result.data),
- *   closeOnScan: true
- * });
  */
 declare function openScanner(options?: ScannerModalOptions): PrescriptionScanner;
 
@@ -467,4 +477,41 @@ declare class CombinedDecoder {
     destroy(): void;
 }
 
-export { type BarcodeDecoder, type BarcodeFormat, type CameraOptions, type CameraStream, CombinedDecoder, ScannerWasmDecoder as DataMatrixDecoder, type DecodedBarcode, type GrayscaleImage, type Point, type PreprocessingOptions, PrescriptionScanner, type ScanResult, type ScannerEvents, type ScannerModalOptions, type ScannerOptions, SuperScanner, ScannerWasmDecoder as ZBarDecoder, adaptiveThreshold, binarize, binarizeOtsu, boxBlur, cleanup, gaussianBlur, getAvailableCameras, grabFrame, grayscaleToRGBA, invert, isCameraSupported, medianFilter, openScanner, otsuThreshold, preprocess, scan, scanAll, scanVideo, sharpen, sharpenLight, startCamera, startScanner, stopCamera, stretchContrast, toGrayscale, toImageData };
+/**
+ * PDF Processor - Extracts images from PDFs for barcode scanning
+ * Uses PDF.js loaded dynamically from CDN
+ */
+/**
+ * Result of PDF processing
+ */
+interface PDFPage {
+    pageNumber: number;
+    imageData: ImageData;
+    width: number;
+    height: number;
+}
+/**
+ * Options for PDF processing
+ */
+interface PDFProcessOptions {
+    /** Scale factor for rendering (default: 2 for better recognition) */
+    scale?: number;
+    /** Maximum pages to process (default: 10) */
+    maxPages?: number;
+    /** Progress callback */
+    onProgress?: (current: number, total: number) => void;
+}
+/**
+ * Process a PDF file and extract pages as ImageData
+ */
+declare function processPDF(file: File | ArrayBuffer, options?: PDFProcessOptions): Promise<PDFPage[]>;
+/**
+ * Check if a file is a PDF
+ */
+declare function isPDF(file: File): boolean;
+/**
+ * Check if PDF.js is loaded
+ */
+declare function isPdfJsLoaded(): boolean;
+
+export { type BarcodeDecoder, type BarcodeFormat, type CameraOptions, type CameraStream, CombinedDecoder, ScannerWasmDecoder as DataMatrixDecoder, type DecodedBarcode, type GrayscaleImage, type PDFPage, type PDFProcessOptions, type Point, type PreprocessingOptions, PrescriptionScanner, type ScanResult, type ScannerEvents, type ScannerModalOptions, type ScannerOptions, SuperScanner, ScannerWasmDecoder as ZBarDecoder, adaptiveThreshold, binarize, binarizeOtsu, boxBlur, cleanup, gaussianBlur, getAvailableCameras, grabFrame, grayscaleToRGBA, invert, isCameraSupported, isPDF, isPdfJsLoaded, medianFilter, openScanner, otsuThreshold, preprocess, processPDF, scan, scanAll, scanVideo, sharpen, sharpenLight, startCamera, startScanner, stopCamera, stretchContrast, toGrayscale, toImageData };
