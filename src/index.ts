@@ -47,7 +47,13 @@ export {
   medianFilter,
   stretchContrast,
   grayscaleToRGBA,
+  // Image enhancement
+  upscaleImage,
+  adjustBrightnessContrast,
+  sharpenRGBA,
+  enhanceForScanning,
 } from './preprocessing';
+export type { EnhanceOptions } from './preprocessing';
 
 // Camera utilities
 export {

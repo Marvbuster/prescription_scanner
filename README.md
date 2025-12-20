@@ -14,6 +14,7 @@ Lightweight WASM barcode scanner for web applications. Supports **DataMatrix** a
 - **NEW: PDF support** - scan barcodes from PDF files
 - **NEW: Multi-code detection** - find all codes in one scan
 - **NEW: File upload** - drag & drop or click to upload
+- **NEW: Image enhancement** - auto upscaling & contrast for better detection
 - Works with any framework (React, Vue, Angular, vanilla JS)
 - Mobile-optimized camera handling
 - Lazy-loads WASM and PDF.js only when needed
@@ -212,8 +213,10 @@ Requires WebAssembly and getUserMedia (camera) support.
 - Added PDF support with PDF.js
 - Added multi-code detection
 - Added file upload UI (drag & drop)
+- Added image enhancement (upscaling, contrast adjustment)
 - Added `onMultiScan` callback
 - Added `getResults()` method
+- Added `enhanceForScanning()` utility
 
 ### v1.0.0
 - Initial release

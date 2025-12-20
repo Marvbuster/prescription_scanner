@@ -374,6 +374,37 @@ declare function medianFilter(gray: GrayscaleImage): GrayscaleImage;
 declare function stretchContrast(gray: GrayscaleImage): GrayscaleImage;
 
 /**
+ * Image Enhancement - Upscaling & Auto-Enhancement
+ */
+/**
+ * Upscale ImageData using bilinear interpolation
+ * Based on wendorf_demo's 2.5x upscaling strategy
+ */
+declare function upscaleImage(imageData: ImageData, scale?: number): ImageData;
+/**
+ * Adjust brightness and contrast on ImageData (RGBA)
+ */
+declare function adjustBrightnessContrast(imageData: ImageData, brightness?: number, contrast?: number): ImageData;
+/**
+ * Simple sharpening on RGBA ImageData
+ */
+declare function sharpenRGBA(imageData: ImageData): ImageData;
+interface EnhanceOptions {
+    /** Upscale images smaller than this (default: 1000) */
+    minSize?: number;
+    /** Upscale factor (default: 2.5) */
+    upscaleFactor?: number;
+    /** Apply brightness/contrast adjustment */
+    adjustColors?: boolean;
+    /** Apply sharpening */
+    sharpen?: boolean;
+}
+/**
+ * Auto-enhance image for better barcode detection
+ */
+declare function enhanceForScanning(imageData: ImageData, options?: EnhanceOptions): ImageData;
+
+/**
  * Apply preprocessing pipeline to ImageData
  */
 declare function preprocess(imageData: ImageData, options?: PreprocessingOptions): GrayscaleImage;
@@ -514,4 +545,4 @@ declare function isPDF(file: File): boolean;
  */
 declare function isPdfJsLoaded(): boolean;
 
-export { type BarcodeDecoder, type BarcodeFormat, type CameraOptions, type CameraStream, CombinedDecoder, ScannerWasmDecoder as DataMatrixDecoder, type DecodedBarcode, type GrayscaleImage, type PDFPage, type PDFProcessOptions, type Point, type PreprocessingOptions, PrescriptionScanner, type ScanResult, type ScannerEvents, type ScannerModalOptions, type ScannerOptions, SuperScanner, ScannerWasmDecoder as ZBarDecoder, adaptiveThreshold, binarize, binarizeOtsu, boxBlur, cleanup, gaussianBlur, getAvailableCameras, grabFrame, grayscaleToRGBA, invert, isCameraSupported, isPDF, isPdfJsLoaded, medianFilter, openScanner, otsuThreshold, preprocess, processPDF, scan, scanAll, scanVideo, sharpen, sharpenLight, startCamera, startScanner, stopCamera, stretchContrast, toGrayscale, toImageData };
+export { type BarcodeDecoder, type BarcodeFormat, type CameraOptions, type CameraStream, CombinedDecoder, ScannerWasmDecoder as DataMatrixDecoder, type DecodedBarcode, type EnhanceOptions, type GrayscaleImage, type PDFPage, type PDFProcessOptions, type Point, type PreprocessingOptions, PrescriptionScanner, type ScanResult, type ScannerEvents, type ScannerModalOptions, type ScannerOptions, SuperScanner, ScannerWasmDecoder as ZBarDecoder, adaptiveThreshold, adjustBrightnessContrast, binarize, binarizeOtsu, boxBlur, cleanup, enhanceForScanning, gaussianBlur, getAvailableCameras, grabFrame, grayscaleToRGBA, invert, isCameraSupported, isPDF, isPdfJsLoaded, medianFilter, openScanner, otsuThreshold, preprocess, processPDF, scan, scanAll, scanVideo, sharpen, sharpenLight, sharpenRGBA, startCamera, startScanner, stopCamera, stretchContrast, toGrayscale, toImageData, upscaleImage };

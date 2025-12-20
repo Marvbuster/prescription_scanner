@@ -6,6 +6,8 @@ import { sharpen, gaussianBlur, medianFilter, stretchContrast } from './filters'
 export { toGrayscale, toImageData } from './grayscale';
 export { binarizeOtsu, adaptiveThreshold, otsuThreshold, binarize, invert } from './binarize';
 export { sharpen, sharpenLight, gaussianBlur, boxBlur, medianFilter, stretchContrast } from './filters';
+export { upscaleImage, adjustBrightnessContrast, sharpenRGBA, enhanceForScanning } from './enhance';
+export type { EnhanceOptions } from './enhance';
 
 /**
  * Apply preprocessing pipeline to ImageData

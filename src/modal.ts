@@ -5,6 +5,7 @@
 
 import { SuperScanner } from './scanner';
 import { processPDF, isPDF, type PDFPage } from './pdf';
+import { enhanceForScanning } from './preprocessing';
 import type { ScanResult, BarcodeFormat } from './types';
 
 // ============================================
@@ -575,13 +576,16 @@ export class PrescriptionScanner {
         });
 
         for (const page of pages) {
-          const results = await this.scanner.scanImageData(page.imageData);
+          // Enhance PDF page for better detection
+          const enhanced = enhanceForScanning(page.imageData);
+          const results = await this.scanner.scanImageData(enhanced);
           foundResults.push(...results);
         }
       } else {
-        // Process image
+        // Process image with enhancement
         const imageData = await this.loadImage(file);
-        foundResults = await this.scanner.scanImageData(imageData);
+        const enhanced = enhanceForScanning(imageData);
+        foundResults = await this.scanner.scanImageData(enhanced);
       }
 
       // Deduplicate by data content
