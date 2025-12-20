@@ -1,0 +1,470 @@
+/**
+ * Supported barcode formats
+ */
+type BarcodeFormat = 'QRCode' | 'DataMatrix';
+/**
+ * Result of a successful barcode scan
+ */
+interface ScanResult {
+    /** The decoded data */
+    data: string;
+    /** The barcode format that was detected */
+    format: BarcodeFormat;
+    /** Corner points of the barcode in the image (if available) */
+    points?: Point[];
+    /** Raw bytes (if available) */
+    rawBytes?: Uint8Array;
+    /** Timestamp of the scan */
+    timestamp: number;
+}
+/**
+ * A point in 2D space
+ */
+interface Point {
+    x: number;
+    y: number;
+}
+/**
+ * Preprocessing options
+ */
+interface PreprocessingOptions {
+    /** Binarization method */
+    binarize?: 'otsu' | 'adaptive' | 'none';
+    /** Apply sharpening filter */
+    sharpen?: boolean;
+    /** Apply denoising */
+    denoise?: boolean;
+    /** Invert colors (for light codes on dark background) */
+    invert?: boolean;
+}
+/**
+ * Camera configuration
+ */
+interface CameraOptions {
+    /** Which camera to use */
+    facingMode?: 'user' | 'environment';
+    /** Preferred resolution */
+    resolution?: {
+        width: number;
+        height: number;
+    };
+    /** Frames per second to scan */
+    scanRate?: number;
+}
+/**
+ * Scanner configuration
+ */
+interface ScannerOptions {
+    /** Which formats to scan for */
+    formats?: BarcodeFormat[];
+    /** Preprocessing configuration */
+    preprocessing?: PreprocessingOptions;
+    /** Camera configuration */
+    camera?: CameraOptions;
+}
+/**
+ * Scanner event types
+ */
+interface ScannerEvents {
+    scan: (result: ScanResult) => void;
+    error: (error: Error) => void;
+    start: () => void;
+    stop: () => void;
+}
+/**
+ * Internal image data for processing
+ */
+interface GrayscaleImage {
+    data: Uint8Array;
+    width: number;
+    height: number;
+}
+
+/**
+ * PRESCRIPTION SCANNER - Vanilla JS Modal
+ * Zero dependencies, selbstständiges Modal mit Scanner
+ */
+
+interface ScannerModalOptions {
+    /** Formate die gescannt werden sollen */
+    formats?: BarcodeFormat[];
+    /** Modal-Titel */
+    title?: string;
+    /** Button-Text */
+    buttonText?: string;
+    /** Nach erfolgreichem Scan schließen */
+    closeOnScan?: boolean;
+    /** Callback bei Scan */
+    onScan?: (result: ScanResult) => void;
+    /** Callback bei Fehler */
+    onError?: (error: Error) => void;
+    /** Callback wenn Modal schließt */
+    onClose?: () => void;
+}
+declare class PrescriptionScanner {
+    private options;
+    private scanner;
+    private overlay;
+    private video;
+    private stream;
+    private stylesInjected;
+    constructor(options?: ScannerModalOptions);
+    /**
+     * Erstellt einen Button der das Scanner-Modal öffnet
+     */
+    createButton(container?: HTMLElement): HTMLButtonElement;
+    /**
+     * Öffnet das Scanner-Modal
+     */
+    open(): Promise<void>;
+    /**
+     * Schließt das Scanner-Modal
+     */
+    close(): void;
+    /**
+     * Cleanup - alle Ressourcen freigeben
+     */
+    destroy(): void;
+    private injectStyles;
+    private createModal;
+    private startScanner;
+    private stopScanner;
+    private showResult;
+}
+/**
+ * Schnellstart - öffnet direkt einen Scanner
+ *
+ * @example
+ * openScanner({
+ *   onScan: (result) => console.log(result.data),
+ *   closeOnScan: true
+ * });
+ */
+declare function openScanner(options?: ScannerModalOptions): PrescriptionScanner;
+
+/**
+ * PRESCRIPTION SCANNER - Super Simple API
+ *
+ * Usage:
+ *
+ *   import { scan, scanVideo } from 'prescription-scanner';
+ *
+ *   // Scan from image
+ *   const result = await scan(imageElement);
+ *   console.log(result); // { data: '...', format: 'DataMatrix' }
+ *
+ *   // Scan continuously from video
+ *   const stop = await scanVideo(videoElement, (result) => {
+ *     console.log('Found:', result.data);
+ *   });
+ *   // Later: stop();
+ */
+
+/**
+ * Scan a single image for barcodes
+ *
+ * @example
+ * const img = document.querySelector('img');
+ * const result = await scan(img);
+ * if (result) {
+ *   console.log(result.data, result.format);
+ * }
+ */
+declare function scan(source: HTMLImageElement | HTMLCanvasElement | ImageData): Promise<ScanResult | null>;
+/**
+ * Scan all barcodes from an image
+ *
+ * @example
+ * const results = await scanAll(img);
+ * results.forEach(r => console.log(r.data));
+ */
+declare function scanAll(source: HTMLImageElement | HTMLCanvasElement | ImageData): Promise<ScanResult[]>;
+/**
+ * Continuously scan from a video element
+ *
+ * @example
+ * const video = document.querySelector('video');
+ * const stop = await scanVideo(video, (result) => {
+ *   console.log('Scanned:', result.data);
+ *   stop(); // Stop after first scan
+ * });
+ *
+ * // Or stop later:
+ * setTimeout(stop, 10000);
+ */
+declare function scanVideo(video: HTMLVideoElement, onScan: (result: ScanResult) => void, options?: {
+    onError?: (error: Error) => void;
+}): Promise<() => void>;
+/**
+ * Request camera access and start scanning
+ * Creates a video element automatically
+ *
+ * @example
+ * const { video, stop } = await startScanner((result) => {
+ *   console.log('Found:', result.data);
+ * });
+ * document.body.appendChild(video);
+ *
+ * // Later:
+ * stop();
+ */
+declare function startScanner(onScan: (result: ScanResult) => void, options?: {
+    container?: HTMLElement;
+    onError?: (error: Error) => void;
+}): Promise<{
+    video: HTMLVideoElement;
+    stop: () => void;
+}>;
+/**
+ * Clean up scanner resources
+ * Call this when you're done scanning
+ */
+declare function cleanup(): void;
+
+/**
+ * Main scanner class - the primary interface for barcode scanning
+ */
+declare class SuperScanner {
+    private options;
+    private decoder;
+    private camera;
+    private scanning;
+    private animationFrame;
+    private lastScanTime;
+    private scanHandlers;
+    private errorHandlers;
+    private startHandlers;
+    private stopHandlers;
+    private static defaultOptions;
+    constructor(options?: ScannerOptions);
+    /**
+     * Initialize the scanner (load WASM modules)
+     */
+    init(): Promise<void>;
+    /**
+     * Register event handler
+     */
+    on(event: 'scan', callback: (result: ScanResult) => void): void;
+    on(event: 'error', callback: (error: Error) => void): void;
+    on(event: 'start' | 'stop', callback: () => void): void;
+    /**
+     * Remove event handler
+     */
+    off(event: 'scan', callback: (result: ScanResult) => void): void;
+    off(event: 'error', callback: (error: Error) => void): void;
+    off(event: 'start' | 'stop', callback: () => void): void;
+    /**
+     * Emit event
+     */
+    private emit;
+    /**
+     * Start scanning from video element
+     */
+    start(videoElement: HTMLVideoElement): Promise<void>;
+    /**
+     * Stop scanning
+     */
+    stop(): void;
+    /**
+     * Main scan loop
+     */
+    private scanLoop;
+    /**
+     * Process a single frame
+     */
+    private processFrame;
+    /**
+     * Scan a single image
+     */
+    scanImage(image: HTMLImageElement): Promise<ScanResult[]>;
+    /**
+     * Scan ImageData directly
+     */
+    scanImageData(imageData: ImageData): Promise<ScanResult[]>;
+    /**
+     * Scan from canvas
+     */
+    scanCanvas(canvas: HTMLCanvasElement): Promise<ScanResult[]>;
+    /**
+     * Check if currently scanning
+     */
+    isScanning(): boolean;
+    /**
+     * Get supported formats
+     */
+    getSupportedFormats(): BarcodeFormat[];
+    /**
+     * Update options
+     */
+    setOptions(options: Partial<ScannerOptions>): void;
+    /**
+     * Clean up resources
+     */
+    destroy(): void;
+}
+
+/**
+ * Convert RGBA ImageData to grayscale using luminosity method
+ * Uses the formula: Y = 0.299*R + 0.587*G + 0.114*B
+ * This matches human perception of brightness
+ */
+declare function toGrayscale(imageData: ImageData): GrayscaleImage;
+/**
+ * Convert grayscale back to ImageData (for debugging/visualization)
+ */
+declare function toImageData(gray: GrayscaleImage): ImageData;
+
+/**
+ * Calculate optimal threshold using Otsu's method
+ * Finds the threshold that minimizes intra-class variance
+ */
+declare function otsuThreshold(gray: GrayscaleImage): number;
+/**
+ * Apply global threshold binarization
+ */
+declare function binarize(gray: GrayscaleImage, threshold: number): GrayscaleImage;
+/**
+ * Apply Otsu's binarization (auto-threshold)
+ */
+declare function binarizeOtsu(gray: GrayscaleImage): GrayscaleImage;
+/**
+ * Adaptive threshold using mean of local neighborhood
+ * Better for images with uneven lighting
+ */
+declare function adaptiveThreshold(gray: GrayscaleImage, blockSize?: number, c?: number): GrayscaleImage;
+/**
+ * Invert a grayscale/binary image
+ */
+declare function invert(gray: GrayscaleImage): GrayscaleImage;
+
+/**
+ * Sharpen image using Laplacian kernel
+ */
+declare function sharpen(gray: GrayscaleImage): GrayscaleImage;
+/**
+ * Light sharpening - less aggressive
+ */
+declare function sharpenLight(gray: GrayscaleImage): GrayscaleImage;
+/**
+ * Apply Gaussian blur (3x3) for noise reduction
+ */
+declare function gaussianBlur(gray: GrayscaleImage): GrayscaleImage;
+/**
+ * Simple box blur (fast)
+ */
+declare function boxBlur(gray: GrayscaleImage): GrayscaleImage;
+/**
+ * Median filter for salt-and-pepper noise (3x3 window)
+ * More expensive but preserves edges better than blur
+ */
+declare function medianFilter(gray: GrayscaleImage): GrayscaleImage;
+/**
+ * Enhance contrast using histogram stretching
+ */
+declare function stretchContrast(gray: GrayscaleImage): GrayscaleImage;
+
+/**
+ * Apply preprocessing pipeline to ImageData
+ */
+declare function preprocess(imageData: ImageData, options?: PreprocessingOptions): GrayscaleImage;
+/**
+ * Convert GrayscaleImage to Uint8ClampedArray (RGBA) for display
+ */
+declare function grayscaleToRGBA(gray: GrayscaleImage): Uint8ClampedArray;
+
+interface CameraStream {
+    video: HTMLVideoElement;
+    stream: MediaStream;
+    canvas: HTMLCanvasElement;
+    ctx: CanvasRenderingContext2D;
+    width: number;
+    height: number;
+}
+/**
+ * Request camera access and set up video stream
+ */
+declare function startCamera(videoElement: HTMLVideoElement, options?: CameraOptions): Promise<CameraStream>;
+/**
+ * Stop camera stream
+ */
+declare function stopCamera(cameraStream: CameraStream): void;
+/**
+ * Grab current frame from video as ImageData
+ */
+declare function grabFrame(camera: CameraStream): ImageData;
+/**
+ * Check if camera is supported
+ */
+declare function isCameraSupported(): boolean;
+/**
+ * Get available cameras
+ */
+declare function getAvailableCameras(): Promise<MediaDeviceInfo[]>;
+
+/**
+ * Interface for barcode decoders
+ */
+interface BarcodeDecoder {
+    /** Name of this decoder */
+    name: string;
+    /** Formats supported by this decoder */
+    supportedFormats: BarcodeFormat[];
+    /** Initialize the decoder (load WASM, etc.) */
+    init(): Promise<void>;
+    /** Check if decoder is ready */
+    isReady(): boolean;
+    /**
+     * Decode barcodes from ImageData
+     * @param imageData Image data from canvas
+     * @param formats Which formats to scan for
+     * @returns Array of detected barcodes
+     */
+    decode(imageData: ImageData, formats: BarcodeFormat[]): Promise<DecodedBarcode[]>;
+    /** Clean up resources */
+    destroy(): void;
+}
+/**
+ * Raw decoded barcode data from a decoder
+ */
+interface DecodedBarcode {
+    data: string;
+    format: BarcodeFormat;
+    points?: Point[];
+    rawBytes?: Uint8Array;
+}
+
+/**
+ * Custom Scanner WASM - 522 KB for 4 formats
+ */
+
+declare class ScannerWasmDecoder implements BarcodeDecoder {
+    name: string;
+    supportedFormats: BarcodeFormat[];
+    private module;
+    private ready;
+    private loading;
+    init(): Promise<void>;
+    private loadModule;
+    private loadScript;
+    isReady(): boolean;
+    decode(imageData: ImageData, formats: BarcodeFormat[]): Promise<DecodedBarcode[]>;
+    destroy(): void;
+}
+
+/**
+ * Combined Decoder - uses our unified WASM
+ * Supports: DataMatrix, QRCode
+ * Size: ~522 KB
+ */
+declare class CombinedDecoder {
+    private decoder;
+    private initialized;
+    constructor();
+    init(formats: BarcodeFormat[]): Promise<void>;
+    decode(imageData: ImageData, formats: BarcodeFormat[]): Promise<ScanResult[]>;
+    getSupportedFormats(): BarcodeFormat[];
+    isReady(): boolean;
+    destroy(): void;
+}
+
+export { type BarcodeDecoder, type BarcodeFormat, type CameraOptions, type CameraStream, CombinedDecoder, ScannerWasmDecoder as DataMatrixDecoder, type DecodedBarcode, type GrayscaleImage, type Point, type PreprocessingOptions, PrescriptionScanner, type ScanResult, type ScannerEvents, type ScannerModalOptions, type ScannerOptions, SuperScanner, ScannerWasmDecoder as ZBarDecoder, adaptiveThreshold, binarize, binarizeOtsu, boxBlur, cleanup, gaussianBlur, getAvailableCameras, grabFrame, grayscaleToRGBA, invert, isCameraSupported, medianFilter, openScanner, otsuThreshold, preprocess, scan, scanAll, scanVideo, sharpen, sharpenLight, startCamera, startScanner, stopCamera, stretchContrast, toGrayscale, toImageData };

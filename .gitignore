@@ -1,0 +1,4 @@
+node_modules/
+wasm/build/
+wasm/zxing-cpp/
+*.map

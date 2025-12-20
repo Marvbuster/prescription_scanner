@@ -1,0 +1,330 @@
+import type {
+  BarcodeFormat,
+  ScanResult,
+  ScannerOptions,
+  ScannerEvents,
+  PreprocessingOptions,
+  CameraOptions,
+} from './types';
+// Preprocessing not needed - WASM handles RGBA directly
+import { CombinedDecoder } from './decoder';
+import {
+  startCamera,
+  stopCamera,
+  grabFrame,
+  isCameraSupported,
+  type CameraStream,
+} from './camera';
+
+/**
+ * Main scanner class - the primary interface for barcode scanning
+ */
+export class SuperScanner {
+  private options: Required<ScannerOptions>;
+  private decoder: CombinedDecoder;
+  private camera: CameraStream | null = null;
+  private scanning = false;
+  private animationFrame: number | null = null;
+  private lastScanTime = 0;
+
+  // Event handlers - using any for flexibility
+  private scanHandlers = new Set<(result: ScanResult) => void>();
+  private errorHandlers = new Set<(error: Error) => void>();
+  private startHandlers = new Set<() => void>();
+  private stopHandlers = new Set<() => void>();
+
+  // Default options
+  private static defaultOptions: Required<ScannerOptions> = {
+    formats: ['QRCode', 'DataMatrix'],
+    preprocessing: {
+      binarize: 'none',
+      sharpen: false,
+      denoise: false,
+      invert: false,
+    },
+    camera: {
+      facingMode: 'environment',
+      resolution: { width: 1280, height: 720 },
+      scanRate: 10, // scans per second
+    },
+  };
+
+  constructor(options: ScannerOptions = {}) {
+    this.options = {
+      ...SuperScanner.defaultOptions,
+      ...options,
+      preprocessing: {
+        ...SuperScanner.defaultOptions.preprocessing,
+        ...options.preprocessing,
+      },
+      camera: {
+        ...SuperScanner.defaultOptions.camera,
+        ...options.camera,
+      },
+    };
+
+    this.decoder = new CombinedDecoder();
+  }
+
+  /**
+   * Initialize the scanner (load WASM modules)
+   */
+  async init(): Promise<void> {
+    await this.decoder.init(this.options.formats);
+  }
+
+  /**
+   * Register event handler
+   */
+  on(event: 'scan', callback: (result: ScanResult) => void): void;
+  on(event: 'error', callback: (error: Error) => void): void;
+  on(event: 'start' | 'stop', callback: () => void): void;
+  on(event: keyof ScannerEvents, callback: (...args: any[]) => void): void {
+    switch (event) {
+      case 'scan':
+        this.scanHandlers.add(callback as (result: ScanResult) => void);
+        break;
+      case 'error':
+        this.errorHandlers.add(callback as (error: Error) => void);
+        break;
+      case 'start':
+        this.startHandlers.add(callback);
+        break;
+      case 'stop':
+        this.stopHandlers.add(callback);
+        break;
+    }
+  }
+
+  /**
+   * Remove event handler
+   */
+  off(event: 'scan', callback: (result: ScanResult) => void): void;
+  off(event: 'error', callback: (error: Error) => void): void;
+  off(event: 'start' | 'stop', callback: () => void): void;
+  off(event: keyof ScannerEvents, callback: (...args: any[]) => void): void {
+    switch (event) {
+      case 'scan':
+        this.scanHandlers.delete(callback as (result: ScanResult) => void);
+        break;
+      case 'error':
+        this.errorHandlers.delete(callback as (error: Error) => void);
+        break;
+      case 'start':
+        this.startHandlers.delete(callback);
+        break;
+      case 'stop':
+        this.stopHandlers.delete(callback);
+        break;
+    }
+  }
+
+  /**
+   * Emit event
+   */
+  private emit(event: 'scan', result: ScanResult): void;
+  private emit(event: 'error', error: Error): void;
+  private emit(event: 'start' | 'stop'): void;
+  private emit(event: keyof ScannerEvents, arg?: any): void {
+    try {
+      switch (event) {
+        case 'scan':
+          for (const handler of this.scanHandlers) handler(arg);
+          break;
+        case 'error':
+          for (const handler of this.errorHandlers) handler(arg);
+          break;
+        case 'start':
+          for (const handler of this.startHandlers) handler();
+          break;
+        case 'stop':
+          for (const handler of this.stopHandlers) handler();
+          break;
+      }
+    } catch (e) {
+      console.error(`Error in ${event} handler:`, e);
+    }
+  }
+
+  /**
+   * Start scanning from video element
+   */
+  async start(videoElement: HTMLVideoElement): Promise<void> {
+    if (this.scanning) {
+      return;
+    }
+
+    if (!isCameraSupported()) {
+      throw new Error('Camera not supported in this browser');
+    }
+
+    // Initialize decoder if not already done
+    if (!this.decoder.isReady()) {
+      await this.init();
+    }
+
+    // Start camera
+    this.camera = await startCamera(videoElement, this.options.camera);
+    this.scanning = true;
+    this.emit('start');
+
+    // Start scan loop
+    this.scanLoop();
+  }
+
+  /**
+   * Stop scanning
+   */
+  stop(): void {
+    if (!this.scanning) {
+      return;
+    }
+
+    this.scanning = false;
+
+    if (this.animationFrame !== null) {
+      cancelAnimationFrame(this.animationFrame);
+      this.animationFrame = null;
+    }
+
+    if (this.camera) {
+      stopCamera(this.camera);
+      this.camera = null;
+    }
+
+    this.emit('stop');
+  }
+
+  /**
+   * Main scan loop
+   */
+  private scanLoop(): void {
+    if (!this.scanning || !this.camera) {
+      return;
+    }
+
+    const now = Date.now();
+    const minInterval = 1000 / (this.options.camera.scanRate || 10);
+
+    if (now - this.lastScanTime >= minInterval) {
+      this.lastScanTime = now;
+
+      // Grab and process frame
+      const imageData = grabFrame(this.camera);
+      this.processFrame(imageData).catch((error) => {
+        this.emit('error', error);
+      });
+    }
+
+    // Schedule next frame
+    this.animationFrame = requestAnimationFrame(() => this.scanLoop());
+  }
+
+  /**
+   * Process a single frame
+   */
+  private async processFrame(imageData: ImageData): Promise<void> {
+    // Decode directly - WASM handles RGBA
+    const results = await this.decoder.decode(imageData, this.options.formats);
+
+    // Emit results
+    for (const result of results) {
+      this.emit('scan', result);
+    }
+  }
+
+  /**
+   * Scan a single image
+   */
+  async scanImage(image: HTMLImageElement): Promise<ScanResult[]> {
+    if (!this.decoder.isReady()) {
+      await this.init();
+    }
+
+    // Create canvas to extract image data
+    const canvas = document.createElement('canvas');
+    canvas.width = image.naturalWidth;
+    canvas.height = image.naturalHeight;
+    const ctx = canvas.getContext('2d');
+
+    if (!ctx) {
+      throw new Error('Could not get canvas context');
+    }
+
+    ctx.drawImage(image, 0, 0);
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+    return this.scanImageData(imageData);
+  }
+
+  /**
+   * Scan ImageData directly
+   */
+  async scanImageData(imageData: ImageData): Promise<ScanResult[]> {
+    if (!this.decoder.isReady()) {
+      await this.init();
+    }
+
+    return this.decoder.decode(imageData, this.options.formats);
+  }
+
+  /**
+   * Scan from canvas
+   */
+  async scanCanvas(canvas: HTMLCanvasElement): Promise<ScanResult[]> {
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      throw new Error('Could not get canvas context');
+    }
+
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    return this.scanImageData(imageData);
+  }
+
+  /**
+   * Check if currently scanning
+   */
+  isScanning(): boolean {
+    return this.scanning;
+  }
+
+  /**
+   * Get supported formats
+   */
+  getSupportedFormats(): BarcodeFormat[] {
+    return this.decoder.getSupportedFormats();
+  }
+
+  /**
+   * Update options
+   */
+  setOptions(options: Partial<ScannerOptions>): void {
+    if (options.preprocessing) {
+      this.options.preprocessing = {
+        ...this.options.preprocessing,
+        ...options.preprocessing,
+      };
+    }
+    if (options.camera) {
+      this.options.camera = {
+        ...this.options.camera,
+        ...options.camera,
+      };
+    }
+    if (options.formats) {
+      this.options.formats = options.formats;
+    }
+  }
+
+  /**
+   * Clean up resources
+   */
+  destroy(): void {
+    this.stop();
+    this.decoder.destroy();
+    this.scanHandlers.clear();
+    this.errorHandlers.clear();
+    this.startHandlers.clear();
+    this.stopHandlers.clear();
+  }
+}

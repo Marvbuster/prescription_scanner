@@ -1,0 +1,56 @@
+{
+  "name": "prescription-scanner",
+  "version": "1.0.0",
+  "description": "Lightweight WASM barcode scanner for DataMatrix and QR codes (495KB)",
+  "author": "Ralf Wichmann",
+  "type": "module",
+  "main": "dist/index.cjs",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "browser": "dist/browser/prescription-scanner.js",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./wasm": {
+      "import": "./dist/scanner.js",
+      "default": "./dist/scanner.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup && cp wasm/scanner.js wasm/scanner.wasm dist/",
+    "build:wasm": "./wasm/build.sh",
+    "build:prod": "tsup --no-sourcemap && cp wasm/scanner.js wasm/scanner.wasm dist/",
+    "dev": "tsup --watch",
+    "prepublishOnly": "npm run build:prod"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.0.0"
+  },
+  "keywords": [
+    "barcode",
+    "qrcode",
+    "qr-code",
+    "datamatrix",
+    "data-matrix",
+    "scanner",
+    "wasm",
+    "webassembly",
+    "camera",
+    "prescription",
+    "pharmacy",
+    "healthcare"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "sideEffects": false
+}
