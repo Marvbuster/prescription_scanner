@@ -25,6 +25,20 @@ interface Point {
     y: number;
 }
 /**
+ * Scan bounds - defines the area to scan within the video frame
+ * Values can be absolute pixels or relative (0-1) to the frame size
+ */
+interface ScanBounds {
+    /** X offset from left (pixels or 0-1 relative) */
+    x: number;
+    /** Y offset from top (pixels or 0-1 relative) */
+    y: number;
+    /** Width of scan area (pixels or 0-1 relative) */
+    width: number;
+    /** Height of scan area (pixels or 0-1 relative) */
+    height: number;
+}
+/**
  * Preprocessing options
  */
 interface PreprocessingOptions {
@@ -88,6 +102,13 @@ interface ScannerOptions {
     preload?: PreloadStrategy;
     /** Formate die gescannt werden sollen */
     formats?: BarcodeFormat[];
+    /**
+     * Scan bounds - area to scan within video frame
+     * Values 0-1 are relative to frame size, >1 are absolute pixels
+     */
+    scanBounds?: ScanBounds;
+    /** Base path for WASM files (scanner.js, scanner.wasm). Default: '/wasm/' */
+    wasmBasePath?: string;
     /** Modal-Titel */
     title?: string;
     /** Button-Text */
@@ -117,6 +138,7 @@ declare class PrescriptionScanner {
     private fileInput;
     private initialized;
     private initializing;
+    private scanBounds;
     constructor(options?: ScannerOptions);
     /**
      * Handle preload strategy
@@ -196,6 +218,27 @@ declare class PrescriptionScanner {
      * Löscht alle bisher gefundenen Ergebnisse
      */
     clearResults(): void;
+    /**
+     * Get current scan bounds
+     * Returns null if scanning full frame
+     */
+    getScanBounds(): ScanBounds | null;
+    /**
+     * Set scan bounds - area to scan within video frame
+     * Values 0-1 are relative to frame size, >1 are absolute pixels
+     * Pass null to scan full frame
+     */
+    setScanBounds(bounds: ScanBounds | null): void;
+    /**
+     * Get computed scan bounds in pixels based on current video dimensions
+     * Returns null if no video or no bounds set
+     */
+    getComputedBounds(): {
+        x: number;
+        y: number;
+        width: number;
+        height: number;
+    } | null;
     private injectStyles;
     private createModal;
     private setupUploadZone;
@@ -464,6 +507,8 @@ declare class ScannerWasmDecoder implements BarcodeDecoder {
     private module;
     private ready;
     private loading;
+    private wasmBasePath;
+    constructor(wasmBasePath?: string);
     init(): Promise<void>;
     private loadModule;
     private loadScript;
@@ -480,7 +525,7 @@ declare class ScannerWasmDecoder implements BarcodeDecoder {
 declare class CombinedDecoder {
     private decoder;
     private initialized;
-    constructor();
+    constructor(wasmBasePath?: string);
     init(formats: BarcodeFormat[]): Promise<void>;
     decode(imageData: ImageData, formats: BarcodeFormat[]): Promise<ScanResult[]>;
     getSupportedFormats(): BarcodeFormat[];
@@ -525,4 +570,4 @@ declare function isPDF(file: File): boolean;
  */
 declare function isPdfJsLoaded(): boolean;
 
-export { type BarcodeDecoder, type BarcodeFormat, type CameraOptions, type CameraStream, CombinedDecoder, type DecodedBarcode, type EnhanceOptions, type GrayscaleImage, type PDFPage, type PDFProcessOptions, type Point, type PreloadStrategy, type PreprocessingOptions, PrescriptionScanner, type ScanResult, type ScannerEvents, type ScannerOptions, ScannerWasmDecoder, adaptiveThreshold, adjustBrightnessContrast, binarize, binarizeOtsu, boxBlur, cleanup, enhanceForScanning, gaussianBlur, getAvailableCameras, grabFrame, grayscaleToRGBA, invert, isCameraSupported, isPDF, isPdfJsLoaded, medianFilter, openScanner, otsuThreshold, preprocess, processPDF, scan, scanAll, scanVideo, sharpen, sharpenLight, sharpenRGBA, startCamera, startScanner, stopCamera, stretchContrast, toGrayscale, toImageData, upscaleImage };
+export { type BarcodeDecoder, type BarcodeFormat, type CameraOptions, type CameraStream, CombinedDecoder, type DecodedBarcode, type EnhanceOptions, type GrayscaleImage, type PDFPage, type PDFProcessOptions, type Point, type PreloadStrategy, type PreprocessingOptions, PrescriptionScanner, type ScanBounds, type ScanResult, type ScannerEvents, type ScannerOptions, ScannerWasmDecoder, adaptiveThreshold, adjustBrightnessContrast, binarize, binarizeOtsu, boxBlur, cleanup, enhanceForScanning, gaussianBlur, getAvailableCameras, grabFrame, grayscaleToRGBA, invert, isCameraSupported, isPDF, isPdfJsLoaded, medianFilter, openScanner, otsuThreshold, preprocess, processPDF, scan, scanAll, scanVideo, sharpen, sharpenLight, sharpenRGBA, startCamera, startScanner, stopCamera, stretchContrast, toGrayscale, toImageData, upscaleImage };
