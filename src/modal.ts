@@ -32,6 +32,8 @@ export interface ScannerOptions {
    * Values 0-1 are relative to frame size, >1 are absolute pixels
    */
   scanBounds?: ScanBounds;
+  /** Base path for WASM files (scanner.js, scanner.wasm). Default: '/wasm/' */
+  wasmBasePath?: string;
   /** Modal-Titel */
   title?: string;
   /** Button-Text */
@@ -323,7 +325,7 @@ const FILE_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" st
 // ============================================
 
 export class PrescriptionScanner {
-  private options: Required<Omit<ScannerOptions, 'scanBounds'>> & { scanBounds?: ScanBounds };
+  private options: Required<Omit<ScannerOptions, 'scanBounds' | 'wasmBasePath'>> & { scanBounds?: ScanBounds; wasmBasePath?: string };
   private scanner: SuperScanner | null = null;
   private overlay: HTMLElement | null = null;
   private video: HTMLVideoElement | null = null;
@@ -342,6 +344,7 @@ export class PrescriptionScanner {
       preload: options.preload ?? 'lazy',
       formats: options.formats || ['DataMatrix', 'QRCode'],
       scanBounds: options.scanBounds,
+      wasmBasePath: options.wasmBasePath,
       title: options.title || 'Barcode scannen',
       buttonText: options.buttonText || 'Scanner öffnen',
       closeOnScan: options.closeOnScan ?? false,
@@ -405,7 +408,7 @@ export class PrescriptionScanner {
 
     this.initializing = true;
     try {
-      this.scanner = new SuperScanner({ formats: this.options.formats });
+      this.scanner = new SuperScanner({ formats: this.options.formats, wasmBasePath: this.options.wasmBasePath });
       await this.scanner.init();
       this.initialized = true;
       this.options.onReady();
@@ -835,7 +838,7 @@ export class PrescriptionScanner {
     try {
       // Initialize scanner if needed
       if (!this.scanner) {
-        this.scanner = new SuperScanner({ formats: this.options.formats });
+        this.scanner = new SuperScanner({ formats: this.options.formats, wasmBasePath: this.options.wasmBasePath });
         await this.scanner.init();
       }
 
@@ -950,6 +953,7 @@ export class PrescriptionScanner {
     try {
       this.scanner = new SuperScanner({
         formats: this.options.formats,
+        wasmBasePath: this.options.wasmBasePath,
       });
 
       await this.scanner.init();

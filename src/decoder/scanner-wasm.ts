@@ -45,6 +45,12 @@ export class ScannerWasmDecoder implements BarcodeDecoder {
   private module: ScannerModule | null = null;
   private ready = false;
   private loading: Promise<void> | null = null;
+  private wasmBasePath: string;
+
+  constructor(wasmBasePath = '/wasm/') {
+    // Normalize: ensure trailing slash
+    this.wasmBasePath = wasmBasePath.endsWith('/') ? wasmBasePath : wasmBasePath + '/';
+  }
 
   async init(): Promise<void> {
     if (this.ready) return;
@@ -54,11 +60,11 @@ export class ScannerWasmDecoder implements BarcodeDecoder {
   }
 
   private async loadModule(): Promise<void> {
-    await this.loadScript('/wasm/scanner.js');
+    await this.loadScript(this.wasmBasePath + 'scanner.js');
     const createScanner = (window as unknown as WindowWithScanner).createScanner;
     if (!createScanner) throw new Error('WASM loader not found');
     this.module = await createScanner({
-      locateFile: (path: string) => path.endsWith('.wasm') ? '/wasm/scanner.wasm' : path
+      locateFile: (path: string) => path.endsWith('.wasm') ? this.wasmBasePath + 'scanner.wasm' : path
     });
     this.ready = true;
   }

@@ -83,6 +83,8 @@ export interface ScannerOptions {
   camera?: CameraOptions;
   /** Scan bounds - area to scan within video frame */
   scanBounds?: ScanBounds;
+  /** Base path for WASM files (scanner.js, scanner.wasm). Default: '/wasm/' */
+  wasmBasePath?: string;
 }
 
 /**

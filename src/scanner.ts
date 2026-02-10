@@ -21,7 +21,7 @@ import {
  * Main scanner class - the primary interface for barcode scanning
  */
 export class SuperScanner {
-  private options: Required<Omit<ScannerOptions, 'scanBounds'>>;
+  private options: Required<Omit<ScannerOptions, 'scanBounds' | 'wasmBasePath'>>;
   private decoder: CombinedDecoder;
   private camera: CameraStream | null = null;
   private scanning = false;
@@ -35,7 +35,7 @@ export class SuperScanner {
   private stopHandlers = new Set<() => void>();
 
   // Default options
-  private static defaultOptions: Required<Omit<ScannerOptions, 'scanBounds'>> = {
+  private static defaultOptions: Required<Omit<ScannerOptions, 'scanBounds' | 'wasmBasePath'>> = {
     formats: ['QRCode', 'DataMatrix'],
     preprocessing: {
       binarize: 'none',
@@ -68,7 +68,7 @@ export class SuperScanner {
       this.scanBounds = options.scanBounds;
     }
 
-    this.decoder = new CombinedDecoder();
+    this.decoder = new CombinedDecoder(options.wasmBasePath);
   }
 
   /**

@@ -14,8 +14,8 @@ export class CombinedDecoder {
   private decoder: ScannerWasmDecoder;
   private initialized = false;
 
-  constructor() {
-    this.decoder = new ScannerWasmDecoder();
+  constructor(wasmBasePath?: string) {
+    this.decoder = new ScannerWasmDecoder(wasmBasePath);
   }
 
   async init(formats: BarcodeFormat[]): Promise<void> {
