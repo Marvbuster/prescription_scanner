@@ -96,7 +96,7 @@ scanner.on('scan', (result) => {
 });
 
 const videoEl = document.querySelector('video');
-await scanner.startCamera(videoEl);
+await scanner.start(videoEl);
 
 // Später:
 scanner.stop();

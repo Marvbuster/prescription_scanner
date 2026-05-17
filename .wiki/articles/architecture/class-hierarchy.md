@@ -31,18 +31,18 @@ classDiagram
   class SuperScanner {
     -options: Required<ScannerOptions>
     -decoder: CombinedDecoder
-    -camera: CameraStream
     -scanning: boolean
     -scanBounds: ScanBounds
     +init() Promise
     +setScanBounds(b) void
     +on(event, cb) void
-    +startCamera(container) Promise
+    +off(event, cb) void
+    +start(video) Promise
     +stop() void
     +scanImage(img) Promise<ScanResult[]>
     +scanCanvas(canvas) Promise<ScanResult[]>
     +scanImageData(data) Promise<ScanResult[]>
-    +scanPDF(file) Promise<ScanResult[]>
+    +destroy() void
   }
   class CombinedDecoder {
     -decoders: BarcodeDecoder[]
@@ -95,20 +95,23 @@ scanner.on('scan',  (result: ScanResult) => {})
 scanner.on('error', (err: Error) => {})
 scanner.on('start', () => {})
 scanner.on('stop',  () => {})
+
+// und auch
+scanner.off('scan', callback);
 ```
 
-Multi-Subscribe möglich — intern `Set<callback>`. Off-Methode aktuell nicht, ist eine Limitation.
+Multi-Subscribe möglich — intern `Set<callback>`. Auch `off(event, callback)` für Cleanup vorhanden (`scanner.ts:121-130`).
 
 ### Continuous-Scanning
 
 ```ts
-await scanner.init();             // WASM laden
-await scanner.startCamera(div);   // requestUserMedia + Video-Element
+await scanner.init();           // WASM laden
+await scanner.start(videoEl);   // attach to existing <video>
 // scanner emit 'scan'-Events laufend
-scanner.stop();                   // stop camera + animationFrame
+scanner.stop();                 // animationFrame stop, Video bleibt User-managed
 ```
 
-Loop nutzt `requestAnimationFrame` mit Throttling auf `scanRate` (Default 10 fps).
+Loop nutzt `requestAnimationFrame` mit Throttling auf `scanRate` (Default 10 fps). Die Kamera/Stream-Verwaltung liegt beim Caller — `SuperScanner` operiert nur auf einem bereits angebundenen `<video>`-Element.
 
 ## `CombinedDecoder`
 
@@ -163,7 +166,7 @@ async decode(rgba: Uint8ClampedArray, width: number, height: number) {
 
 ## `PrescriptionScanner` (Modal)
 
-`src/modal.ts:1071-` — High-Level mit UI:
+`src/modal.ts:327` (Datei 1071 Zeilen) — High-Level mit UI:
 
 - Erzeugt Modal-DOM (Header, Close-Button, Video-Container, Datei-Upload, Status-Bar)
 - Inline-CSS (`STYLES`-String, ~200 Zeilen)

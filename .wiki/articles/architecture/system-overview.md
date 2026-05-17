@@ -82,8 +82,8 @@ Siehe [Simple-API](../api/simple-api.md) und [Prescription-Scanner-Klasse](../ap
 | `HTMLImageElement` | `scan(img)` |
 | `HTMLCanvasElement` | `scan(canvas)` |
 | `ImageData` | `scan(imageData)` |
-| `<video>`-Stream | `scanVideo(video, cb)` oder über `SuperScanner.startCamera()` |
-| PDF-File | `scanner.scanPDF(file)` (Modal-Klasse oder direkt) |
+| `<video>`-Stream | `scanVideo(video, cb)` oder direkt `SuperScanner.start(video)` (`scanner.ts:171`) |
+| PDF-File | `scanner.scanPDF(file)` — nur auf der `PrescriptionScanner`-Modal-Klasse (`modal.ts:455`); für reinen Headless-PDF-Scan via `processPDF` + `scan` aus `src/pdf` |
 
 ## Tech-Stack
 

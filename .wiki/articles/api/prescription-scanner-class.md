@@ -23,8 +23,9 @@ High-Level-Wrapper mit eingebauter Modal-UI. Für Apps, die schnell einen produk
 import { PrescriptionScanner } from 'prescription-scanner';
 
 const scanner = new PrescriptionScanner({
-  // Modal-Modus (default true, false = Headless)
-  headless: false,
+  // Default true. Beeinflusst nicht, ob die Modal-UI angezeigt wird (`open()` rendert immer);
+  // sondern markiert den Headless-Use-Case, wenn man scanImage/scanCanvas/start direkt aufruft.
+  headless: true,
 
   // WASM-Preload
   preload: 'idle',                    // 'lazy' | 'idle' | 'eager' | false
@@ -101,13 +102,16 @@ Triggert WASM-Load manuell — nützlich bei `preload: false`-Strategie.
 
 Static-Scan-Methoden, identisch zu denen auf `SuperScanner` — aber durch die `PrescriptionScanner`-Instanz erreichbar.
 
-### `setOptions(opts)`
+### `setOptions(opts)` — nur auf `SuperScanner`
+
+`setOptions` ist **nicht** direkt auf `PrescriptionScanner` exponiert, sondern auf dem inneren `SuperScanner` (`scanner.ts:388`). Zugriff:
 
 ```ts
-scanner.setOptions({ formats: ['QRCode'] });
+scanner.scanner?.setOptions({ formats: ['QRCode'] });
+// oder einfach: neue PrescriptionScanner-Instanz erzeugen
 ```
 
-Update der Optionen während Runtime (z.B. nach User-Interaction Format wechseln).
+In der Praxis selten gebraucht — Optionen werden meist im Konstruktor festgelegt.
 
 ## Modal-UI
 

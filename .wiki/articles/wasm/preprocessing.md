@@ -149,7 +149,7 @@ Auf einem M1 Mac. Mobile ist langsamer.
 
 Beim Standard-Scan **wird kein Preprocessing angewendet**. Der WASM-Decoder bekommt direkt das Roh-RGBA. Preprocessing ist Opt-In für schwierige Cases.
 
-Im Continuous-Scanning-Loop (`startCamera`) wäre Preprocessing per Frame zu teuer — daher dort meistens unbenutzt.
+Im Continuous-Scanning-Loop (`SuperScanner.start(video)`) wäre Preprocessing per Frame zu teuer — daher dort meistens unbenutzt.
 
 ## Edge Cases
 

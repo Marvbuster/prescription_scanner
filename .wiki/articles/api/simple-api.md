@@ -84,9 +84,9 @@ const stop = await scanVideo(videoEl, (result) => {
 setTimeout(stop, 10000);  // 10s Timeout
 ```
 
-Internal: nutzt `SuperScanner.startCamera()`+`scanner.on('scan', cb)`, gibt die Stop-Funktion zurück.
+Internal: registriert `scanner.on('scan', cb)`, ruft `scanner.start(video)` (`simple.ts:107-125`), gibt eine Stop-Funktion zurück, die `scanner.stop()` + `scanner.off()` aufruft.
 
-⚠️ Die Funktion expectet einen **bereits aktiven `<video>`-Stream**. Wenn die Kamera noch nicht läuft, muss man entweder die Modal-Klasse oder `startCamera()` direkt nutzen.
+⚠️ Die Funktion expectet einen **bereits angebundenen `<video>`-Stream**. Wenn die Kamera noch nicht läuft, kann man entweder `startScanner(onScan, opts)` aus `simple.ts:140-170` nutzen (legt selbst ein `<video>`-Element an + ruft `getUserMedia` indirekt) oder die `PrescriptionScanner`-Modal-Klasse.
 
 ## Singleton-Caching
 
