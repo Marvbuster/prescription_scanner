@@ -99,7 +99,7 @@ Was im NPM-Tarball landet. `src/`, `tests/`, `wasm/` werden ausgespart — User 
 
 ## Browser-Build
 
-`dist/browser/prescription-scanner.js` — IIFE-Bundle für `<script>`-Einbindung ohne Bundler:
+`<dist/browser/prescription-scanner.js>` (Build-Output, gitignored) — IIFE-Bundle für `<script>`-Einbindung ohne Bundler:
 
 ```html
 <script src="https://unpkg.com/prescription-scanner/dist/browser/prescription-scanner.js"></script>

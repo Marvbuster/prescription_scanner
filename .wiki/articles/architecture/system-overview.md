@@ -27,7 +27,7 @@ code_refs:
 | Version | 1.1.6 |
 | Lizenz | MIT AND Apache-2.0 (zxing-cpp Apache-2.0) |
 | Bundle | ESM + CJS + Types in `dist/` |
-| Browser-Build | `dist/browser/prescription-scanner.js` |
+| Browser-Build | `<dist/browser/prescription-scanner.js>` (build output) |
 | WASM-Dateien | `dist/scanner.js` (53 KB) + `dist/scanner.wasm` (442 KB) |
 | Tree-shaking | `sideEffects: false` |
 
