@@ -1,7 +1,7 @@
 ---
 title: "Simple-API — scan, scanAll, scanVideo"
 created: 2026-05-14
-updated: 2026-05-14
+updated: 2026-06-11
 category: api
 tags: [api, simple, scan, video]
 status: current
@@ -86,7 +86,7 @@ setTimeout(stop, 10000);  // 10s Timeout
 
 Internal: registriert `scanner.on('scan', cb)`, ruft `scanner.start(video)` (`simple.ts:107-125`), gibt eine Stop-Funktion zurück, die `scanner.stop()` + `scanner.off()` aufruft.
 
-⚠️ Die Funktion expectet einen **bereits angebundenen `<video>`-Stream**. Wenn die Kamera noch nicht läuft, kann man entweder `startScanner(onScan, opts)` aus `simple.ts:140-170` nutzen (legt selbst ein `<video>`-Element an + ruft `getUserMedia` indirekt) oder die `PrescriptionScanner`-Modal-Klasse.
+Die Kamera muss **nicht** vorher laufen: `scanner.start(video)` ruft selbst `startCamera(videoElement, this.options.camera)` auf (`scanner.ts:171-191`) und bindet den Stream an das übergebene `<video>`. Wer kein eigenes `<video>`-Element hat, nutzt `startScanner(onScan, opts)` aus `simple.ts:140-170` (legt das Element selbst an) oder die `PrescriptionScanner`-Modal-Klasse.
 
 ## Singleton-Caching
 

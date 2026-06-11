@@ -1,7 +1,7 @@
 ---
 title: "Modal vs. Headless — Wann was nutzen"
 created: 2026-05-14
-updated: 2026-05-14
+updated: 2026-06-11
 category: architecture
 tags: [modal, headless, ux]
 status: current
@@ -70,8 +70,11 @@ await scanner.open();  // zeigt Modal
 
 ```ts
 import { openScanner } from 'prescription-scanner';
-const result = await openScanner();  // returns ScanResult oder null bei Close
+const scanner = openScanner({ onScan: (result) => console.log(result.data) });
+// synchron: erzeugt eine PrescriptionScanner-Instanz, ruft open() und gibt die Instanz zurück
 ```
+
+`openScanner()` ist **synchron** und gibt die `PrescriptionScanner`-Instanz zurück (`src/modal.ts:1065-1069`) — Scan-Ergebnisse kommen über den `onScan`-Callback, nicht als Promise-Resolve.
 
 ## Headless-Modus
 
@@ -83,10 +86,10 @@ Direkt mit `SuperScanner` (`src/scanner.ts`) oder den `simple.ts`-Funktionen.
 - Mehr Kontrolle (Custom-Layout, Custom-Statusanzeige, A11y)
 - Direkter Zugriff auf Event-Stream
 
-**Nutzung**:
+**Nutzung** (repo-intern — `SuperScanner` wird **nicht** aus dem Package-Entry `src/index.ts` exportiert; externe Consumer nutzen die `simple.ts`-Funktionen wie `startScanner`/`scanVideo`):
 
 ```ts
-import { SuperScanner } from 'prescription-scanner';
+import { SuperScanner } from './scanner';  // interner Import, nicht 'prescription-scanner'
 
 const scanner = new SuperScanner({ formats: ['DataMatrix'] });
 await scanner.init();
@@ -96,7 +99,7 @@ scanner.on('scan', (result) => {
 });
 
 const videoEl = document.querySelector('video');
-await scanner.start(videoEl);
+await scanner.start(videoEl);  // startet selbst die Kamera auf dem <video>
 
 // Später:
 scanner.stop();

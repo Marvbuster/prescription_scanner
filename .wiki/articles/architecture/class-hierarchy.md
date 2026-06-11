@@ -1,7 +1,7 @@
 ---
 title: "Klassen-Hierarchie — SuperScanner + Decoder"
 created: 2026-05-14
-updated: 2026-05-14
+updated: 2026-06-11
 category: architecture
 tags: [classes, design, decoder]
 status: current
@@ -106,12 +106,12 @@ Multi-Subscribe möglich — intern `Set<callback>`. Auch `off(event, callback)`
 
 ```ts
 await scanner.init();           // WASM laden
-await scanner.start(videoEl);   // attach to existing <video>
+await scanner.start(videoEl);   // startet selbst die Kamera auf dem <video>
 // scanner emit 'scan'-Events laufend
-scanner.stop();                 // animationFrame stop, Video bleibt User-managed
+scanner.stop();                 // animationFrame stop + stopCamera()
 ```
 
-Loop nutzt `requestAnimationFrame` mit Throttling auf `scanRate` (Default 10 fps). Die Kamera/Stream-Verwaltung liegt beim Caller — `SuperScanner` operiert nur auf einem bereits angebundenen `<video>`-Element.
+Loop nutzt `requestAnimationFrame` mit Throttling auf `scanRate` (Default 10 fps). Die Kamera-Verwaltung übernimmt `SuperScanner` selbst: `start(videoElement)` ruft `startCamera(videoElement, this.options.camera)` auf (`scanner.ts:171-191`), `stop()` stoppt den Stream via `stopCamera()`.
 
 ## `CombinedDecoder`
 

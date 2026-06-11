@@ -1,7 +1,7 @@
 ---
 title: "Systemüberblick — WASM-Barcode-Scanner"
 created: 2026-05-14
-updated: 2026-05-14
+updated: 2026-06-10
 category: architecture
 tags: [overview, wasm, barcode, datamatrix, qrcode]
 status: current
@@ -28,7 +28,7 @@ code_refs:
 | Lizenz | MIT AND Apache-2.0 (zxing-cpp Apache-2.0) |
 | Bundle | ESM + CJS + Types in `dist/` |
 | Browser-Build | `<dist/browser/prescription-scanner.js>` (build output) |
-| WASM-Dateien | `dist/scanner.js` (53 KB) + `dist/scanner.wasm` (442 KB) |
+| WASM-Dateien | `wasm/scanner.js` (53 KB) + `wasm/scanner.wasm` (442 KB) — beim Build nach `dist/` kopiert |
 | Tree-shaking | `sideEffects: false` |
 
 ## High-Level

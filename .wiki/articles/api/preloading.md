@@ -1,7 +1,7 @@
 ---
 title: "Preloading — WASM-Lade-Strategien"
 created: 2026-05-14
-updated: 2026-05-14
+updated: 2026-06-11
 category: api
 tags: [preload, wasm, performance, ux]
 status: current
@@ -22,7 +22,7 @@ Das WASM-Modul ist ~495 KB (komprimiert ~200 KB). Auf langsamen Verbindungen mer
 | Strategie | Wann gestartet | UX-Effekt |
 |-----------|----------------|-----------|
 | `'lazy'` (default) | beim ersten Scan | Initial-Bundle klein, erster Scan hat WASM-Latenz |
-| `'idle'` | bei `requestIdleCallback` (oder 1s-Fallback) | Optimal: WASM lädt nebenher, erster Scan ist sofort bereit |
+| `'idle'` | bei `requestIdleCallback` mit 5s-Timeout (oder 100ms-Fallback) | Optimal: WASM lädt nebenher, erster Scan ist sofort bereit |
 | `'eager'` | sofort beim `new PrescriptionScanner()` | WASM beginnt zu laden, blockiert nicht — Konstruktor returnt sofort |
 | `false` | nie automatisch — manuell via `scanner.preload()` oder `init()` | volle Kontrolle, für komplexe Lazy-Pattern |
 
@@ -38,14 +38,14 @@ Das WASM-Modul ist ~495 KB (komprimiert ~200 KB). Auf langsamen Verbindungen mer
 ## `'idle'`-Implementierung
 
 ```ts
-if (window.requestIdleCallback) {
-  requestIdleCallback(() => this.preload());
+if (typeof requestIdleCallback !== 'undefined') {
+  requestIdleCallback(() => this.preload(), { timeout: 5000 });
 } else {
-  setTimeout(() => this.preload(), 1000);  // Fallback für Safari < 17
+  setTimeout(() => this.preload(), 100);  // Fallback für Safari
 }
 ```
 
-Browser-API `requestIdleCallback` lädt nur, wenn der Main-Thread idle ist. Safari < 17 hatte das lang nicht, daher der 1s-Fallback.
+(`src/modal.ts:376-381`.) Browser-API `requestIdleCallback` lädt, wenn der Main-Thread idle ist — spätestens aber nach dem 5s-`timeout`. Safari ohne `requestIdleCallback` bekommt einen 100ms-`setTimeout`-Fallback.
 
 ## `'eager'`-Implementierung
 
@@ -139,7 +139,7 @@ const scanner = new PrescriptionScanner({ wasmBasePath: '/static/wasm/' });
 | `scanner.js` 404 | Error im Console + `onError`-Callback |
 | `scanner.wasm` 404 | gleich — Loader meldet „WASM loader not found" |
 | Mehrere `PrescriptionScanner`-Instanzen | jede lädt **ihren eigenen** Module-Singleton (innerhalb der Instanz cached) |
-| `requestIdleCallback` nicht da | 1s-`setTimeout`-Fallback greift |
+| `requestIdleCallback` nicht da | 100ms-`setTimeout`-Fallback greift |
 | Browser-Tab im Background bei `'idle'` | `requestIdleCallback` feuert evtl. erst beim Re-Focus |
 
 ## Verwandte Artikel

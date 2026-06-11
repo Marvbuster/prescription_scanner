@@ -1,7 +1,7 @@
 ---
 title: "PrescriptionScanner — Modal-Klasse"
 created: 2026-05-14
-updated: 2026-05-14
+updated: 2026-06-11
 category: api
 tags: [modal, ui, class, scanner]
 status: current
@@ -159,17 +159,14 @@ Ein-Liner für den einfachsten Fall:
 ```ts
 import { openScanner } from 'prescription-scanner';
 
-const result = await openScanner({
+const scanner = openScanner({
   title: 'Rezept scannen',
   formats: ['DataMatrix'],
+  onScan: (result) => console.log(result.data),
 });
-
-if (result) {
-  console.log(result.data);
-}
 ```
 
-Promise resolved mit `ScanResult` bei Success oder `null` bei Close ohne Scan.
+Synchron: erzeugt eine `PrescriptionScanner`-Instanz, ruft `open()` auf und gibt die **Instanz** zurück (`src/modal.ts:1065-1069`). Scan-Ergebnisse kommen über den `onScan`-Callback — es gibt kein Promise auf `ScanResult | null`.
 
 ## PDF-Support
 
