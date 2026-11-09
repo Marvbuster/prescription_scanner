@@ -8,3 +8,7 @@ demo/node_modules/
 demo/.next/
 demo/.env*.local
 .idea/
+
+# lokal, nicht versionieren
+.DS_Store
+status.txt
